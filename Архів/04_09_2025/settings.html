@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Налаштування ESP32</title>
+</head>
+<body>
+  <h2>Налаштування ESP32</h2>
+  <form method="POST" action="/save">
+    <p>IP: <strong>%IP_ADDRESS%</strong></p>
+    <p>Назва пристрою: <input type="text" name="device_name" value="%DEVICE_NAME%"></p>
+    <p>WiFi SSID: <input type="text" name="ssid" value="%WIFI_SSID%"></p>
+    <p>Пароль WiFi: <input type="password" name="password"></p>
+    <p>UTC Зміщення (наприклад -2): <input type="number" name="timezone_offset" value="%TZ_OFFSET%" min="-12" max="14"></p>
+    <p><label><input type="checkbox" name="use_dst" %USE_DST_CHECKED%> Літній час (DST)</label></p>
+
+    <p><label><input type="checkbox" name="switch1" %SW1_CHECKED%> Годинник</label></p>
+    <p><label><input type="checkbox" name="switch2" %SW2_CHECKED%> Барометер</label></p>
+    <p><label><input type="checkbox" name="switch3" %SW3_CHECKED%> Заповіт</label></p>
+    <p><label><input type="checkbox" name="switch4" %SW4_CHECKED%> Фото</label></p>
+    <p><label><input type="checkbox" name="switch5" %SW5_CHECKED%> Слава</label></p>
+    <p><label><input type="checkbox" name="switch6" %SW6_CHECKED%> Тризуб</label></p>
+    <p><label><input type="checkbox" name="switch7" %SW7_CHECKED%> Москалі їбучі</label></p>
+
+    <p><button type="submit">Зберегти</button></p>
+  </form>
+  <a href="/">⬅ Назад</a>
+</body>
+</html>
+<form method="POST" action="/restart" onsubmit="return confirm('Справді перезавантажити ESP32?');">
+  <button type="submit" style="background-color:#dc3545; color:white; margin-top:20px; font-size: 20px; padding: 12px 24px;">
+    🔁 Перезавантажити ESP32
+  </button>
+</form>
+

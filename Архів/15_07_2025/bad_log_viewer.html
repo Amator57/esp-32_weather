@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Графіки BME280</title>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Zoom plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.umd.min.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
+    h2 { text-align: center; }
+    canvas { background: #fff; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+    .btns { text-align: center; margin-top: 10px; }
+    button {
+      margin: 5px; padding: 10px 20px;
+      font-size: 16px; border: none;
+      background: #007bff; color: #fff; border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h2>Графіки температури, тиску та вологості</h2>
+
+  <canvas id="bmeChart" width="1000" height="400"></canvas>
+
+  <div class="btns">
+    <button onclick="resetZoom()">🔄 Скинути масштаб</button>
+  </div>
+
+  <script>
+    let chart;
+
+    async function loadChartData() {
+      try {
+        const res = await fetch('/bme_chart_data'); // або /api/history.json
+        const data = await res.json();
+
+        const labels = data.map(item => item.time);
+        const temps = data.map(item => item.temperature);
+        const hums = data.map(item => item.humidity);
+        const press = data.map(item => item.pressure);
+
+        const ctx = document.getElementById('bmeChart').getContext('2d');
+
+        if (chart) chart.destroy(); // перезавантаження графіка
+
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Температура (°C)',
+                data: temps,
+                borderColor: 'red',
+                yAxisID: 'y_temp',
+                tension: 0.2
+              },
+              {
+                label: 'Вологість (%)',
+                data: hums,
+                borderColor: 'blue',
+                yAxisID: 'y_hum',
+                tension: 0.2
+              },
+              {
+                label: 'Тиск (гПа)',
+                data: press,
+                borderColor: 'green',
+                yAxisID: 'y_pres',
+                tension: 0.2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            interaction: {
+              mode: 'index',
+              intersect: false
+            },
+            stacked: false,
+            scales: {
+              x: {
+                title: { display: true, text: 'Час' },
+                ticks: { autoSkip: true, maxTicksLimit: 12 }
+              },
+              y_temp: {
+                type: 'linear',
+                position: 'left',
+                title: { display: true, text: 'Температура (°C)' },
+                ticks: { color: 'red' }
+              },
+              y_hum: {
+                type: 'linear',
+                position: 'right',
+                title: { display: true, text: 'Вологість (%)' },
+                ticks: { color: 'blue' },
+                grid: { drawOnChartArea: false }
+              },
+              y_pres: {
+                type: 'linear',
+                position: 'right',
+                offset: true,
+                title: { display: true, text: 'Тиск (гПа)' },
+                ticks: { color: 'green' },
+                grid: { drawOnChartArea: false }
+              }
+            },
+            plugins: {
+              zoom: {
+                zoom: {
+                  wheel: { enabled: true },
+                  pinch: { enabled: true },
+                  mode: 'x'
+                },
+                pan: {
+                  enabled: true,
+                  mode: 'x'
+                },
+                limits: {
+                  x: { minRange: 60 * 60 * 1000 } // Мін. 1 година (у мілісекундах)
+                }
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Помилка завантаження графіка:", e);
+      }
+    }
+
+    function resetZoom() {
+      if (chart) chart.resetZoom();
+    }
+
+    loadChartData();
+    setInterval(loadChartData, 60000); // Оновлення раз на хвилину
+  </script>
+</body>
+</html>

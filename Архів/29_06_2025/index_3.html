@@ -1,0 +1,38 @@
+<<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 Погода</title>
+</head>
+<body>
+    <h2>Ласкаво просимо на Веб-Сервер ESP32!</h2>
+    <p>Це головна сторінка вашого ESP32 пристрою, підключеного в режимі STA.</p>
+
+    <h3>Загальна інформація:</h3>
+    <p>Поточний час на ESP32: <span id="current_time_display">%CURRENT_TIME%</span></p>
+    <p>Поточна IP-адреса ESP32: <span id="ip_address_display">%IP_ADDRESS%</span></p>
+    <p>Назва пристрою: <span id="device_name_display">%DEVICE_NAME%</span></p>
+    <p>Підключено до Wi-Fi (SSID): <span id="wifi_ssid_display">%WIFI_SSID%</span></p>
+
+    <h2>Поточні показники BME280:</h2>
+    <p>Температура: <span id="temperature">Завантаження...</span> &deg;C</p>
+    <p>Вологість: <span id="humidity">Завантаження...</span> %</p>
+    <p>Тиск: <span id="pressure">Завантаження...</span> гПа</p>
+    <p>Тиск: <span id="presmmhg">Завантаження...</span> mmHg</p>
+
+    <h3>Графік BME280 (Останній день):</h3>
+    <canvas id="bmeChart" width="800" height="400"></canvas>
+
+    <p>
+    <a href="/">Головна</a> |
+    <a href="/settings">Налаштування</a> |
+    <a href="/logs">📁 Архів графіків</a>
+    </p>
+
+    <!-- ✅ Спочатку Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- ✅ Потім ваш скрипт -->
+    <script src="/graph.js"></script>
+</body>
+</html>

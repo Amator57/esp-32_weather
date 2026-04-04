@@ -1,0 +1,1 @@
+server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");

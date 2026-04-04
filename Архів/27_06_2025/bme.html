@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Дані BME280</title>
+</head>
+<body>
+  <h2>Дані з BME280</h2>
+  <p>🌡️ Температура: <span id="temp">--</span> °C</p>
+  <p>💧 Вологість: <span id="hum">--</span> %</p>
+  <p>📈 Тиск: <span id="pres">--</span> hPa</p>
+  <a href="/">⬅ Назад</a>
+
+  <script>
+    function fetchBME() {
+      fetch('/bme')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('temp').textContent = data.temp;
+          document.getElementById('hum').textContent = data.hum;
+          document.getElementById('pres').textContent = data.pres;
+        })
+        .catch(error => console.error('Помилка отримання даних:', error));
+    }
+
+    fetchBME(); // одразу після завантаження
+    setInterval(fetchBME, 60000); // кожні 60 секунд
+  </script>
+</body>
+</html>
+
+
+
+

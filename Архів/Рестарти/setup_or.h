@@ -1,0 +1,583 @@
+//Стара, працююча версія. Є більш нова оптимізована
+void setup() {
+  Serial.begin(115200);
+ tft.init();
+  tft.setRotation(1);   // Задати альбомну орієнтацію один раз
+  tft.setTextWrap(false); // Задати обгортання тексту один раз
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+
+  Wire.begin();
+  rtc.begin();
+
+//+++++++++++++++++++++++++++++++++
+ Serial.println("Ініціалізація SPIFFS...");
+  if (!SPIFFS.begin()) {
+    Serial.println("❌ Помилка при монтуванні SPIFFS");
+    // Якщо SPIFFS не може змонтуватися, спробуйте відформатувати лише один раз
+    // Однак, ми вже виключили це як регулярну проблему.
+    // Якщо тут завжди помилка, це серйозніше.
+    while (true) { delay(100); } // Застрягти тут, якщо SPIFFS не монтується
+  }
+  Serial.println("✅ SPIFFS успішно змонтовано.");
+
+  resetHistoryForNewDay(); // скидаємо індекс історії на нуль
+   Serial.println("✅ Індекс історії успішно очищено.");
+  //=========================
+  //Видалення конкретного лог-файлу
+       // deleteLogFile("unknown.csv"); //  deleteLogFile("2025-07-10.csv");
+       // Serial.println("✅ Заданий файл історії успішно очищено.");
+  //=========================
+  // ==== Ваш існуючий код для створення директорії /log ====
+  // Перевіряємо та створюємо директорію /log, якщо її немає
+  if (!SPIFFS.exists("/log")) {
+    Serial.println("[SETUP] Директорія /log не знайдена, створюю...");
+    if (!SPIFFS.mkdir("/log")) {
+      Serial.println("❌ [ERROR] Не вдалося створити директорію /log!");
+      // Якщо директорію не вдалося створити, ми не зможемо зберегти логи
+      while (true) { delay(100); } // Застрягти тут
+    }
+    Serial.println("✅ [SETUP] Директорія /log успішно створена.");
+  } else {
+    Serial.println("[SETUP] Директорія /log вже існує.");
+  }
+  // =========================================================
+
+  // ==== НОВИЙ ДІАГНОСТИЧНИЙ КОД ====
+  Serial.println("Перевіряю вміст кореневої директорії SPIFFS:");
+  File root = SPIFFS.open("/");
+  if (root && root.isDirectory()) {
+    File file = root.openNextFile();
+    int fileCount = 0;
+    while (file) {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      if (file.isDirectory()) {
+        Serial.println(" (DIRECTORY)");
+      } else {
+        Serial.print(" (FILE, size: ");
+        Serial.print(file.size());
+        Serial.println(" bytes)");
+      }
+      file = root.openNextFile();
+      fileCount++;
+    }
+    if (fileCount == 0) {
+      Serial.println("  Коренева директорія порожня.");
+    }
+  } else {
+    Serial.println("❌ Не вдалося відкрити кореневу директорію SPIFFS.");
+  }
+  Serial.println("=========================================");
+ 
+//+++++++++++++++++++++++++++++++++
+  bme.begin(0x76);
+
+  // ІНІЦІАЛІЗАЦІЯ МАСИВУ ІСТОРІЇ
+  for (int j = 0; j < MAX_MEASUREMENTS; ++j) {
+      history[j].timeStr = "";
+      history[j].temperature = 0.0f;
+      history[j].humidity = 0.0f;
+      history[j].pressure = 0.0f;
+  }
+  
+  loadConfig();
+  //++++++++++++++++++++++++++++++++++++++
+  String tzString = buildTZString(tzOffset, useDST);
+  setenv("TZ", tzString.c_str(), 1);
+  tzset();
+  //++++++++++++++++++++++++++++++++++++++
+  WiFi.begin("Smart_House", "Telemat5311051");
+  delay(3000); // Даємо час для спроби підключення до STA
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("❌ Режим STA не підключився, запускаю режим AP...");
+    // FIX: Виклик WiFi.softAPIP() переміщено після успішного старту WiFi.softAP()
+    if (WiFi.softAP("ESP32_Config", "12345678")) {
+      String apIP = WiFi.softAPIP().toString(); // Отримуємо IP тільки після старту AP
+      Serial.println("✅ Режим AP успішно запущено. IP: " + apIP);
+      tft.drawString("AP Mode: " + apIP, 10, 50);
+    } else {
+      Serial.println("❌ Не вдалося запустити режим AP!");
+      tft.drawString("AP Mode Failed!", 10, 50);
+    }
+  } else {
+    wifiSSID = WiFi.SSID();
+    String ip = WiFi.localIP().toString();
+    Serial.println("✅ Підключено до WiFi: " + wifiSSID + ", IP: " + ip);
+    tft.drawString("WiFi: " + wifiSSID, 10, 50);
+    tft.drawString("IP: " + ip, 10, 70);
+  }
+  delay(3000);
+// === НОВЕ: Перше зчитування даних BME280 одразу після запуску ===
+    // Цей блок коду заповнює lastTemp, lastHum, lastPress актуальними значеннями.
+    lastTemp = bme.readTemperature();
+    lastHum = bme.readHumidity();
+    lastPress = bme.readPressure(); // lastPress зберігається в Паскалях
+
+    Serial.printf("Initial BME280: Temp=%.1fC, Hum=%.1f%%, Press=%.1fPa\n", lastTemp, lastHum, lastPress);
+
+configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov"); 
+
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                        timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+  }
+  //++++++++++++++++++++++++++++++++++++++
+
+  //Працююча. Можливо причина рестартів Закоментована після #include "web_handlers.h"
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/index.html", "text/html", false, processor);
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  server.on("/graph.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/graph.js", "application/javascript");
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  server.on("/log_export", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (!request->hasParam("date")) {
+      request->send(400, "text/plain", "❌ Вкажи параметр ?date=YYYY-MM-DD");
+      return;
+    }
+
+    String date = request->getParam("date")->value(); // напр. "2025-06-28"
+    String path = "/log/" + date + ".csv";
+
+    if (!SPIFFS.exists(path)) {
+      request->send(404, "text/html; charset=utf-8", "<h2>❌ Файл не знайдено</h2>");
+      return;
+    }
+    //++++++++++++++++++++++++++++++++++++++
+    // Забезпечуємо правильне завантаження файлу CSV
+    AsyncResponseStream *response = request->beginResponseStream("text/html");
+response->addHeader("Content-Type", "text/html; charset=utf-8");
+
+response->print("<h2>Доступні архіви:</h2><ul>");
+
+File root = SPIFFS.open("/log");
+if (!root || !root.isDirectory()) {
+  response->print("<li>Немає доступних лог-файлів.</li>");
+} else {
+  File file = root.openNextFile();
+  while (file) {
+    String path = file.name();
+    if (!path.endsWith(".csv")) {
+      file = root.openNextFile();
+      continue;
+    }
+
+    String name = path;
+    name.replace("/log/", "");
+    name.replace(".csv", "");
+
+    response->print("<li>");
+    response->print("<a href=\"/log_viewer?date=" + name + "\">📊 " + name + "</a> ");
+    response->print("(<a href=\"" + path + "\">csv</a>)");
+    response->print("</li>");
+
+    file = root.openNextFile();
+  }
+}
+
+response->print("</ul><p><a href=\"/\">На головну</a></p>");
+request->send(response);
+});
+    /*
+    AsyncWebServerResponse *response = request->beginResponse(SPIFFS, path, "text/csv");
+    response->addHeader("Content-Disposition", "attachment; filename=\"" + date + ".csv\"");
+    request->send(response);
+  });
+  */
+  //++++++++++++++++++++++++++++++++++++++
+  server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/settings.html", "text/html", false, processor);
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  server.on("/restart", HTTP_POST, [](AsyncWebServerRequest *request){
+    request->send(200, "text/html", R"rawliteral(
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Перезавантаження</title>
+        <script>
+          setTimeout(function() {
+            window.location.href = "/";
+          }, 8000); // почекай 8 секунд і перенаправ
+        </script>
+      </head>
+      <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+        <h2>🔁 Пристрій перезавантажується...</h2>
+        <p>Будь ласка, зачекайте кілька секунд.</p>
+      </body>
+      </html>
+    )rawliteral");
+    delay(500); // дати час відповіді HTTP
+    ESP.restart();
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+
+  //++++++++++++++++++++++++++++++++++++++
+  server.on("/bme.html", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/bme.html", "text/html; charset=utf-8");
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  server.on("/bme_data", HTTP_GET, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(256);
+    doc["temperature"] = bme.readTemperature();
+    doc["humidity"]    = bme.readHumidity();
+    doc["pressure"]    = bme.readPressure() / 100.0F;
+    doc["presmmhg"]    = bme.readPressure() / 133.322F;
+
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  // ==== Графік поточних даних (динамічна вісь Y) ==== 
+  server.on("/bme_chart_data", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->print("[");
+    bool first = true;
+
+    // Змінні для динамічного діапазону графіку
+    float minTemp = 1000, maxTemp = -1000;
+    float minHum = 1000, maxHum = -1000;
+    float minPress = 2000, maxPress = 0;
+
+    for (int i = 0; i < MAX_POINTS; i++) {
+      int idx = (historyIndex + i) % MAX_POINTS;
+      const BMEData &d = history[idx];
+      if (d.timeStr == "") continue;
+
+      if (!first) response->print(",");
+      first = false;
+
+      // оновлення діапазонів
+      if (d.temperature < minTemp) minTemp = d.temperature;
+      if (d.temperature > maxTemp) maxTemp = d.temperature;
+      if (d.humidity < minHum) minHum = d.humidity;
+      if (d.humidity > maxHum) maxHum = d.humidity;
+      if (d.pressure < minPress) minPress = d.pressure;
+      if (d.pressure > maxPress) maxPress = d.pressure;
+
+      response->printf(
+        "{\"time\":\"%s\",\"temperature\":%.2f,\"humidity\":%.2f,\"pressure\":%.2f}",
+        d.timeStr.c_str(), d.temperature, d.humidity, d.pressure
+      );
+    }
+
+    response->print("]");
+    request->send(response);
+  });
+  //++++++++++++++++++++++++++++++++++++++
+  // Виведення архівних графіків
+  server.on("/bme_chart_data_archive", HTTP_GET, [](AsyncWebServerRequest *request) {
+  if (!request->hasParam("date")) {
+    request->send(400, "text/plain", "❌ Вкажіть параметр ?date=YYYY-MM-DD");
+    return;
+  }
+
+  String date = request->getParam("date")->value();
+  String path = "/log/" + date + ".csv";
+
+  if (!SPIFFS.exists(path)) {
+    request->send(404, "application/json", "[]");  // Порожній графік
+    return;
+  }
+
+  File file = SPIFFS.open(path, FILE_READ);
+  if (!file) {
+    request->send(500, "application/json", "[]");
+    return;
+  }
+
+  AsyncResponseStream *response = request->beginResponseStream("application/json");
+  response->print("[");
+  bool first = true;
+
+  while (file.available()) {
+    String line = file.readStringUntil('\n');
+    line.trim();
+    if (line == "" || line.startsWith("Time")) continue;
+
+    int idx1 = line.indexOf(',');
+    int idx2 = line.indexOf(',', idx1 + 1);
+    int idx3 = line.indexOf(',', idx2 + 1);
+
+    if (idx1 < 0 || idx2 < 0 || idx3 < 0) continue;
+
+    String timeStr = line.substring(0, idx1);
+    float temp = line.substring(idx1 + 1, idx2).toFloat();
+    float hum = line.substring(idx2 + 1, idx3).toFloat();
+    float press = line.substring(idx3 + 1).toFloat();
+
+    if (!first) response->print(",");
+    first = false;
+
+    response->printf(
+      "{\"time\":\"%s\",\"temperature\":%.2f,\"humidity\":%.2f,\"pressure\":%.2f}",
+      timeStr.c_str(), temp, hum, press
+    );
+  }
+
+  response->print("]");
+  request->send(response);
+});
+//++++++++++++Динамічний масштаб++++++++++
+//15.07.2025. Не перевірено
+server.on("/api/history.json", HTTP_GET, [](AsyncWebServerRequest *request){
+  File file = SPIFFS.open("/log/2025-07-14.csv");  // поточна дата
+  if (!file || file.isDirectory()) {
+    request->send(404, "application/json", "{\"error\":\"Файл не знайдено\"}");
+    return;
+  }
+
+  DynamicJsonDocument doc(8192); // або більший розмір
+  JsonArray arr = doc.to<JsonArray>();
+
+  while (file.available()) {
+    String line = file.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0) continue;
+
+    // CSV: time;temp;hum;pres
+    int t1 = line.indexOf(';');
+    int t2 = line.indexOf(';', t1 + 1);
+    int t3 = line.indexOf(';', t2 + 1);
+
+    if (t1 > 0 && t2 > t1 && t3 > t2) {
+      String time = line.substring(0, t1);
+      float temp = line.substring(t1 + 1, t2).toFloat();
+      float hum  = line.substring(t2 + 1, t3).toFloat();
+      float pres = line.substring(t3 + 1).toFloat();
+
+      JsonObject obj = arr.createNestedObject();
+      obj["time"] = time;
+      obj["temperature"] = temp;
+      obj["humidity"] = hum;
+      obj["pressure"] = pres;
+    }
+  }
+
+  file.close();
+
+  String json;
+  serializeJson(doc, json);
+  request->send(200, "application/json", json);
+});
+
+  //++++++++++++++++++++++++++++++++++++++
+   
+  // не повний шлях до файлу .csv 15.07.2025
+  server.on("/log_list.json", HTTP_GET, [](AsyncWebServerRequest *request){
+    File root = SPIFFS.open("/log");
+    File file = root.openNextFile();
+
+    String json = "[";
+    bool first = true;
+
+    while (file) {
+      String path = file.name();
+      if (!path.endsWith(".csv")) {
+        file = root.openNextFile();
+        continue;
+      }
+      if (!first) json += ",";
+      first = false;
+
+      String name = path;
+      name.replace("/log/", "");
+      json += "{\"name\":\"" + name + "\",\"path\":\"" + path + "\"}";
+      file = root.openNextFile();
+    }
+
+    json += "]";
+    request->send(200, "application/json", json);
+  });
+  
+  //=============================================================================== 
+  
+  // Працює. Заміна - намагання уникнути рестартів Закоментована після #include "web_handlers.h"
+  server.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
+  AsyncResponseStream *response = request->beginResponseStream("text/html");
+  response->addHeader("Content-Type", "text/html; charset=utf-8");
+
+  response->print(F("<h2>Доступні архіви:</h2><ul>"));
+
+  File root = SPIFFS.open("/log");
+  if (!root || !root.isDirectory()) {
+    response->print(F("<li>Немає доступних лог-файлів.</li>"));
+  } else {
+    File file = root.openNextFile();
+    while (file) {
+      String fullPath = file.name();  // Наприклад: /log/2025-07-22.csv
+
+      if (!fullPath.endsWith(".csv")) {
+        file = root.openNextFile();
+        continue;
+      }
+
+      String fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);  // 2025-07-22.csv
+      String datePart = fileName;
+      datePart.replace(".csv", "");  // 2025-07-22
+
+      response->print("<li>");
+      response->print("<a href=\"/log_viewer?date=" + datePart + "\">📊 " + datePart + "</a> ");
+      response->print("(<a href=\"/log/" + fileName + "\">csv</a>)");
+      response->print("</li>");
+
+      file = root.openNextFile();
+    }
+  }
+
+  response->print(F("</ul><p><a href=\"/\">На головну</a></p>"));
+  request->send(response);
+});
+
+/*
+//працює 24.07.2025 10:40 Заміна - намагання уникнути рестартів Закоментована після #include "web_handlers.h"
+server.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request){
+  String html = "<h2>Доступні архіви:</h2><ul>";
+
+  File root = SPIFFS.open("/log");
+  if (!root || !root.isDirectory()) {
+    html += "<li>Немає доступних лог-файлів.</li>";
+  } else {
+    File file = root.openNextFile();
+    while (file) {
+      String fullPath = file.name();  // /log/2025-07-22.csv
+      if (!fullPath.endsWith(".csv")) {
+        file = root.openNextFile();
+        continue;
+      }
+
+      String fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1); // 2025-07-22.csv
+      String datePart = fileName;
+      datePart.replace(".csv", ""); // 2025-07-22
+
+      html += "<li>";
+      html += "<a href=\"/log_viewer?date=" + datePart + "\">📊 " + datePart + "</a> ";
+      html += "(<a href=\"/log/" + fileName + "\">csv</a>)";  // <-- ОНОВЛЕНО
+      html += "</li>";
+
+      file = root.openNextFile();
+    }
+  }
+
+  html += "</ul><p><a href=\"/\">На головну</a></p>";
+
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+  response->addHeader("Content-Type", "text/html; charset=utf-8");
+  request->send(response);
+});
+
+*/
+ //++++++++++++++++++++++++++++++++++++++
+ 
+ //Працює. Можлива причина рестартів Закоментована після #include "web_handlers.h"
+  server.on("/log_viewer", HTTP_GET, [](AsyncWebServerRequest *request){
+    AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/log_viewer.html", "text/html");
+    response->addHeader("Content-Type", "text/html; charset=utf-8");
+    request->send(response);
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  
+  // Працює. На кнопці Ок абракадабра
+  server.on("/save", HTTP_POST, [&](AsyncWebServerRequest *request){
+      if (request->hasParam("device_name", true))
+          deviceName = request->getParam("device_name", true)->value();
+      if (request->hasParam("ssid", true))
+          wifiSSID = request->getParam("ssid", true)->value();
+
+      if (request->hasParam("timezone_offset", true))
+          tzOffset = request->getParam("timezone_offset", true)->value().toInt();
+
+      useDST = request->hasParam("use_dst", true);
+
+      // Формування tzString
+      String sign = tzOffset >= 0 ? "-" : "+";
+      int absOffset = abs(tzOffset);
+      String tzString = "UTC" + sign + String(absOffset);
+      if (useDST)
+          tzString += "DST,M3.5.0/3,M10.5.0/4";
+
+      setenv("TZ", tzString.c_str(), 1);
+      tzset();
+
+      switch1 = request->hasParam("switch1", true);
+      switch2 = request->hasParam("switch2", true);
+      switch3 = request->hasParam("switch3", true);
+      switch4 = request->hasParam("switch4", true);
+      switch5 = request->hasParam("switch5", true);
+      switch6 = request->hasParam("switch6", true);
+      switch7 = request->hasParam("switch7", true);
+
+      saveConfig();
+
+      //request->send(200, "text/html",
+      request->send(200, "text/html; charset=utf-8",
+        "<script>alert('Налаштування збережено!');location.href='/settings';</script>");
+  });
+ 
+  //++++++++++++++++++++++++++++++++++++++
+  
+  // Працює. Можлива причина рестартів Закоментована після #include "web_handlers.h"
+server.on("/save_now", HTTP_GET, [](AsyncWebServerRequest *request){
+  bool *param = new bool(false);  // ❗ ручне збереження без очищення масиву
+  xTaskCreatePinnedToCore(
+    saveHistoryTask,
+    "SaveHistory",
+    8192,
+    param,
+    1,
+    NULL,
+    1
+  );
+  request->send(200, "text/plain", "✅ Ручне збереження розпочато у фоновому режимі.");
+});
+
+  //++++++++++++++++++++++++++++++++++++++
+  // --- NEW handler for /log/*.csv files to serve them correctly ---
+  server.on("/log/*.csv", HTTP_GET, [](AsyncWebServerRequest *request){
+    String path = request->url(); // Отримуємо повний шлях, наприклад, "/log/2025-06-30.csv"
+    if (SPIFFS.exists(path)) {
+      // Важливо: встановлюємо Content-Type як text/csv та вказуємо charset=utf-8
+      AsyncWebServerResponse *response = request->beginResponse(SPIFFS, path, "text/csv");
+      response->addHeader("Content-Type", "text/csv; charset=utf-8"); // Додано charset
+      request->send(response);
+    } else {
+      request->send(404, "text/plain", "Файл архіву не знайдено!");
+    }
+  });
+
+  //++++++++++++++++++++++++++++++++++++++
+  // --- UPDATED onNotFound handler ---
+  server.onNotFound([](AsyncWebServerRequest *request){
+    // Відправляємо HTML-сторінку 404 з коректним кодуванням UTF-8
+    request->send(404, "text/html; charset=utf-8", "<h1>404</h1><p>Сторінка не знайдена!</p>");
+  });
+  //++++++++++++++++++++++++++++++++++++++
+  // Обробка запитів для файлів логів з директорії /log/
+  // URL-шлях "/log/" відповідає директорії "/log/" на SPIFFS
+  server.serveStatic("/log/", SPIFFS, "/log/")
+  .setCacheControl("no-store, no-cache, must-revalidate");
+  //++++++++++++++++++++++++++++++++++++++
+  
+  
+  // Запуск веб-сервера
+  server.begin();
+  // ✅ Реєстрація всіх веб-хендлерів одним викликом
+  
+     currentDisplayMode = MODE_DATETIME; // Або якийсь інший режим за замовчуванням
+     executeDisplayMode(currentDisplayMode); // Відобразити початковий режим
+     displayModeStartTime = millis(); // Запустити таймер для цього режиму
+}

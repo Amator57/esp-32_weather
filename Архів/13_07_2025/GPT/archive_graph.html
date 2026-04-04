@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Архівні графіки BME280</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+  <style>
+    body {
+      font-family: Arial;
+      margin: 20px;
+      background: #f0f0f0;
+    }
+    canvas {
+      background: #fff;
+      padding: 10px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 0 5px #aaa;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h2>Архівні графіки температури, тиску та вологості</h2>
+  <button onclick="resetZoom()">🔄 Скинути масштаб</button>
+
+  <canvas id="archiveChart" width="800" height="400"></canvas>
+
+  <script>
+    let archiveChart;
+
+    async function loadArchiveChart() {
+      try {
+        const res = await fetch('/archive_chart_data'); // має повертати архів у JSON
+        const data = await res.json();
+
+        const labels = data.map(item => item.time);
+        const temps = data.map(item => item.temperature);
+        const hums = data.map(item => item.humidity);
+        const press = data.map(item => item.pressure);
+
+        const ctx = document.getElementById('archiveChart').getContext('2d');
+        if (archiveChart) archiveChart.destroy();
+
+        archiveChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Температура (°C)',
+                data: temps,
+                borderColor: 'red',
+                fill: false,
+                yAxisID: 'y_temp'
+              },
+              {
+                label: 'Вологість (%)',
+                data: hums,
+                borderColor: 'blue',
+                fill: false,
+                yAxisID: 'y_hum'
+              },
+              {
+                label: 'Тиск (гПа)',
+                data: press,
+                borderColor: 'green',
+                fill: false,
+                yAxisID: 'y_pres'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            interaction: {
+              mode: 'index',
+              intersect: false
+            },
+            stacked: false,
+            plugins: {
+              zoom: {
+                pan: {
+                  enabled: true,
+                  mode: 'x'
+                },
+                zoom: {
+                  wheel: {
+                    enabled: true
+                  },
+                  pinch: {
+                    enabled: true
+                  },
+                  mode: 'x'
+                }
+              }
+            },
+            scales: {
+              x: {
+                display: true,
+                title: {
+                  display: true,
+                  text: 'Час'
+                }
+              },
+              y_temp: {
+                type: 'linear',
+                position: 'left',
+                title: {
+                  display: true,
+                  text: 'Температура (°C)'
+                },
+                ticks: {
+                  color: 'red'
+                }
+              },
+              y_hum: {
+                type: 'linear',
+                position: 'right',
+                title: {
+                  display: true,
+                  text: 'Вологість (%)'
+                },
+                ticks: {
+                  color: 'blue'
+                },
+                grid: {
+                  drawOnChartArea: false
+                }
+              },
+              y_pres: {
+                type: 'linear',
+                position: 'right',
+                offset: true,
+                title: {
+                  display: true,
+                  text: 'Тиск (гПа)'
+                },
+                ticks: {
+                  color: 'green'
+                },
+                grid: {
+                  drawOnChartArea: false
+                }
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.error("❌ Помилка завантаження архівного графіка:", e);
+      }
+    }
+
+    function resetZoom() {
+      if (archiveChart) archiveChart.resetZoom();
+    }
+
+    loadArchiveChart();
+  </script>
+</body>
+</html>

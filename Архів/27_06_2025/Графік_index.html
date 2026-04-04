@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 Погода</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h2>Ласкаво просимо на Веб-Сервер ESP32!</h2>
+    <p>Це головна сторінка вашого ESP32 пристрою, підключеного в режимі STA.</p>
+
+    <h3>Загальна інформація:</h3>
+    <p>Поточний час на ESP32: <span id="current_time_display">%CURRENT_TIME%</span></p>
+    <p>Поточна IP-адреса ESP32: <span id="ip_address_display">%IP_ADDRESS%</span></p>
+    <p>Назва пристрою: <span id="device_name_display">%DEVICE_NAME%</span></p>
+    <p>Підключено до Wi-Fi (SSID): <span id="wifi_ssid_display">%WIFI_SSID%</span></p>
+
+    <h2>Поточні показники BME280:</h2>
+    <p>Температура: <span id="temperature">Завантаження...</span> &deg;C</p>
+    <p>Вологість: <span id="humidity">Завантаження...</span> %</p>
+    <p>Тиск: <span id="pressure">Завантаження...</span> гПа</p>
+    <p>Тиск: <span id="presmmhg">Завантаження...</span> mmHg</p>
+
+    <h3>Графік BME280 (Останні 100 значень):</h3>
+    <canvas id="bmeChart" width="800" height="400"></canvas>
+
+    <p><a href="/">Головна</a> <a href="/settings">Налаштування</a></p>
+
+    <script>
+        function fetchBMEData() {
+            fetch('/bme_data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('temperature').innerText = data.temperature.toFixed(2);
+                    document.getElementById('humidity').innerText = data.humidity.toFixed(2);
+                    document.getElementById('pressure').innerText = data.pressure.toFixed(2);
+                    document.getElementById('presmmhg').innerText = data.presmmhg.toFixed(2);
+                })
+                .catch(error => {
+                    console.error('Помилка отримання даних BME280:', error);
+                    document.getElementById('temperature').innerText = 'Помилка';
+                    document.getElementById('humidity').innerText = 'Помилка';
+                    document.getElementById('pressure').innerText = 'Помилка';
+                    document.getElementById('presmmhg').innerText = 'Помилка';
+                });
+        }
+
+        async function loadChart() {
+            try {
+                const res = await fetch('/bme_chart_data');
+                const data = await res.json();
+
+                const labels = data.map(item => item.time);
+                const temps = data.map(item => item.temperature);
+                const hums = data.map(item => item.humidity);
+                const press = data.map(item => item.pressure);
+
+                const ctx = document.getElementById('bmeChart').getContext('2d');
+                if (window.myChart) window.myChart.destroy(); // оновлюємо графік
+                window.myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Температура (°C)', data: temps, borderColor: 'red', fill: false },
+                            { label: 'Вологість (%)', data: hums, borderColor: 'blue', fill: false },
+                            { label: 'Тиск (гПа)', data: press, borderColor: 'green', fill: false }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: { display: true, title: { display: true, text: 'Час' } },
+                            y: { display: true, title: { display: true, text: 'Значення' } }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("Помилка завантаження графіка:", e);
+            }
+        }
+
+        fetchBMEData();
+        loadChart();
+        setInterval(fetchBMEData, 60000);
+        setInterval(loadChart, 60000);
+    </script>
+</body>
+</html>

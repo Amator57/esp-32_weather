@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Архівний графік BME280</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+</head>
+<body>
+    <h2>Графік з архіву</h2>
+    <p id="info">Завантаження...</p>
+    <canvas id="bmeChart" width="800" height="400"></canvas>
+    <p><a href="/logs">← До списку архівів</a></p>
+
+    <script>
+    function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+    }
+
+    const date = getQueryParam("date");
+    if (!date) {
+        document.getElementById("info").innerText = "❗ Не вказано параметр ?date=YYYY-MM-DD";
+    } else {
+        const path = `/log/${date}.csv`;
+        fetch(path)
+            .then(res => {
+                if (!res.ok) throw new Error("Файл не знайдено, або помилка завантаження: " + res.status);
+                return res.text();
+            })
+            .then(text => {
+                const lines = text.trim().split("\n");
+                const temps = [], hums = [], press = [];
+
+                // Перевіряємо, чи є дані крім заголовка
+                if (lines.length <= 1) {
+                    throw new Error("Файл порожній або містить лише заголовок.");
+                }
+
+                for (let i = 1; i < lines.length; i++) {
+                    const [dateTimeStr, t, h, p] = lines[i].split(","); // dateTimeStr тепер містить "YYYY-MM-DD HH:MM:SS"
+                    const ts = new Date(dateTimeStr); // Парсимо повну дату-час
+
+                    const temp = parseFloat(t);
+                    const hum = parseFloat(h);
+                    const pres = parseFloat(p);
+                    if (!isNaN(temp) && !isNaN(hum) && !isNaN(pres) && !isNaN(ts.getTime())) { // Додано перевірку на валідність дати
+                        temps.push({ x: ts, y: temp });
+                        hums.push({ x: ts, y: hum });
+                        press.push({ x: ts, y: pres });
+                    }
+                }
+
+                // Сортуємо по часу (хоча вже має бути відсортовано, це для надійності)
+                temps.sort((a, b) => a.x - b.x);
+                hums.sort((a, b) => a.x - b.x);
+                press.sort((a, b) => a.x - b.x);
+
+                const minTime = temps[0]?.x;
+                const maxTime = temps[temps.length - 1]?.x;
+
+                if (!minTime || !maxTime || temps.length === 0) { // Перевірка на відсутність даних
+                    throw new Error("Недостатньо коректних даних для побудови графіка.");
+                }
+
+                document.getElementById("info").innerText = `Графік за ${date}`;
+                const ctx = document.getElementById('bmeChart').getContext('2d');
+                // *** ДОДАЙТЕ ЦЕЙ РЯДОК ТУТ (ПЕРЕД new Chart) ***
+                Chart.defaults.adapters.date.locale = 'en-GB';
+                // АБО, якщо ви додали <script src="https://cdn.jsdelivr.net/npm/date-fns/locale/uk.js"></script>
+                // Chart.defaults.adapters.date.locale = dateFns_locale_uk; 
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Температура (°C)',
+                                data: temps,
+                                borderColor: 'red',
+                                borderWidth: 1,
+                                yAxisID: 'y_temp'
+                            },
+                            {
+                                label: 'Вологість (%)',
+                                data: hums,
+                                borderColor: 'blue',
+                                borderWidth: 1,
+                                yAxisID: 'y_hum'
+                            },
+                            {
+                                label: 'Тиск (гПа)',
+                                data: press,
+                                borderColor: 'green',
+                                borderWidth: 1,
+                                yAxisID: 'y_pres'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        stacked: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                min: minTime,
+                                max: maxTime,
+                                time: {
+                                    unit: 'hour',
+                                    displayFormats: { hour: 'HH:mm' }
+                                },
+                                title: { display: true, text: 'Час' }
+                            },
+                            y_temp: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'Темп (°C)' },
+                                // min: -30, // Можете налаштувати динамічно, якщо потрібно
+                                // max: 50,
+                                ticks: { color: 'red' }
+                            },
+                            y_hum: {
+                                type: 'linear',
+                                position: 'right',
+                                title: { display: true, text: 'Вологість (%)' },
+                                // min: 0,
+                                // max: 100,
+                                ticks: { color: 'blue' },
+                                grid: { drawOnChartArea: false }
+                            },
+                            y_pres: {
+                                type: 'linear',
+                                position: 'right',
+                                offset: true,
+                                title: { display: true, text: 'Тиск (гПа)' },
+                                // min: 950,
+                                // max: 1050,
+                                ticks: { color: 'green' },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                document.getElementById("info").innerText = "❌ Помилка завантаження або обробки даних: " + err.message;
+                console.error("Помилка:", err);
+            });
+    }
+    </script>
+    <script src="/graph.js"></script>
+
+</body>
+</html>

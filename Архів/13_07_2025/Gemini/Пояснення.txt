@@ -1,0 +1,17 @@
+Ключові зміни:
+
+Підключення плагіна chartjs-plugin-zoom: Додано <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@latest/dist/chartjs-plugin-zoom.min.js"></script>до <head>в index.htmlта log_viewer.html.
+
+Конфігурація плагіна zoomу graph.js(у секції options):
+
+pan.enabled: true, pan.mode: 'x'дозволяє перетягувати графік горизонтально.
+
+zoom.wheel.enabled: true, zoom.pinch.enabled: true, zoom.mode: 'x'дозволяє масштабувати графік горизонтально колесом миші або жестом "щипок" на сенсорних пристроях.
+
+Налаштування осі X ( scales.x):
+
+type: 'time'та time.unit: 'minute'забезпечує коректне відображення часу.
+
+minта maxосі X тепер динамічно встановлюються таким чином, щоб за замовчуванням показувати останню годину даних на екрані.
+
+Після заміни цих файлів на ваші пристрої ESP32 ви можете масштабувати та прокручувати графіки показників BME280.

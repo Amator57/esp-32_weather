@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Архівний графік BME280 (DEBUG)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2 id="info">Завантаження...</h2>
+  <canvas id="bmeChart" width="400" height="200"></canvas>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const date = urlParams.get('date');
+
+    if (!date) {
+      document.getElementById("info").innerText = "❗ Не вказано параметр ?date=YYYY-MM-DD";
+    } else {
+      document.getElementById("info").innerText = `Архів за: ${date}`;
+
+      const path = `/log/${date}.csv`;
+      fetch(path)
+        .then(response => {
+          if (!response.ok) throw new Error("Файл не знайдено");
+          return response.text();
+        })
+        .then(data => {
+          console.log("📄 Вміст CSV:");
+          console.log(data);
+
+          const lines = data.trim().split("\n").slice(1); // без заголовка
+          console.log("📊 Кількість рядків:", lines.length);
+
+          const labels = [], temps = [], hums = [], press = [];
+
+          lines.forEach(line => {
+            console.log("▶️ Рядок:", line);
+            const parts = line.split(",");
+            console.log("→ Поділено:", parts);
+
+            if (parts.length >= 4) {
+              labels.push(parts[0]);
+              temps.push(parseFloat(parts[1]));
+              hums.push(parseFloat(parts[2]));
+              press.push(parseFloat(parts[3]));
+            }
+          });
+
+          if (labels.length === 0) {
+            console.warn("⚠️ Жодних даних не розібрано з CSV.");
+            document.getElementById("info").innerText = "⚠️ CSV-файл не містить даних.";
+            document.getElementById("bmeChart").style.display = "none";
+            return;
+          }
+
+          console.log("✅ Приклад:", labels[0], temps[0], hums[0], press[0]);
+
+          const ctx = document.getElementById("bmeChart").getContext("2d");
+          if (window.myChart) window.myChart.destroy();
+
+          window.myChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: labels,
+              datasets: [
+                { label: "Температура (°C)", data: temps, borderColor: "red", fill: false },
+                { label: "Вологість (%)", data: hums, borderColor: "blue", fill: false },
+                { label: "Тиск (hPa)", data: press, borderColor: "green", fill: false }
+              ]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: { title: { display: true, text: "Час" } },
+                y: { title: { display: true, text: "Значення" } }
+              }
+            }
+          });
+        })
+        .catch(error => {
+          console.error("❌ Помилка:", error);
+          document.getElementById("info").innerText =
+            "❌ Помилка завантаження або обробки даних: " + error.message;
+          document.getElementById("bmeChart").style.display = "none";
+        });
+    }
+  </script>
+</body>
+</html>

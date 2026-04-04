@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Архівний графік BME280 (AutoScale)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2 id="info">Завантаження...</h2>
+  <canvas id="bmeChart" width="400" height="200"></canvas>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const date = urlParams.get('date');
+
+    if (!date) {
+      document.getElementById("info").innerText = "❗ Не вказано параметр ?date=YYYY-MM-DD";
+    } else {
+      document.getElementById("info").innerText = `Архів за: ${date}`;
+      const path = `/log/${date}.csv`;
+
+      fetch(path)
+        .then(response => {
+          if (!response.ok) throw new Error("Файл не знайдено");
+          return response.text();
+        })
+        .then(data => {
+          const lines = data.trim().split("\n").slice(1);
+          const delimiter = data.includes(";") ? ";" : ",";
+
+          const labels = [], temps = [], hums = [], press = [];
+
+          lines.forEach(line => {
+            const parts = line.split(delimiter);
+            if (parts.length >= 4) {
+              labels.push(parts[0]);
+              temps.push(parseFloat(parts[1]));
+              hums.push(parseFloat(parts[2]));
+              press.push(parseFloat(parts[3]));
+            }
+          });
+
+          const ctx = document.getElementById("bmeChart").getContext("2d");
+          if (window.myChart) window.myChart.destroy();
+
+          window.myChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "Температура (°C)",
+                  data: temps,
+                  borderColor: "red",
+                  backgroundColor: "rgba(255,0,0,0.1)",
+                  yAxisID: 'yTemp'
+                },
+                {
+                  label: "Вологість (%)",
+                  data: hums,
+                  borderColor: "blue",
+                  backgroundColor: "rgba(0,0,255,0.1)",
+                  yAxisID: 'yHum'
+                },
+                {
+                  label: "Тиск (hPa)",
+                  data: press,
+                  borderColor: "green",
+                  backgroundColor: "rgba(0,255,0,0.1)",
+                  yAxisID: 'yPres'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              interaction: {
+                mode: 'index',
+                intersect: false
+              },
+              stacked: false,
+              scales: {
+                x: {
+                  title: { display: true, text: "Час" }
+                },
+                yTemp: {
+                  type: 'linear',
+                  display: true,
+                  position: 'left',
+                  title: { display: true, text: 'Температура (°C)' }
+                },
+                yHum: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  title: { display: true, text: 'Вологість (%)' },
+                  grid: { drawOnChartArea: false }
+                },
+                yPres: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  offset: true,
+                  title: { display: true, text: 'Тиск (hPa)' },
+                  grid: { drawOnChartArea: false }
+                }
+              }
+            }
+          });
+        })
+        .catch(error => {
+          console.error("❌ Помилка:", error);
+          document.getElementById("info").innerText =
+            "❌ Помилка завантаження або обробки даних: " + error.message;
+          document.getElementById("bmeChart").style.display = "none";
+        });
+    }
+  </script>
+</body>
+</html>

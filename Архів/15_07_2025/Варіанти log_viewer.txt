@@ -1,0 +1,1 @@
+Zoom_statist_log_viewer.html - не відображає графіків архівних даних

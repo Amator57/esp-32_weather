@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Архівний графік BME280</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h2>Графік з архіву</h2>
+    <p id="info">Завантаження...</p>
+    <canvas id="bmeChart" width="800" height="400"></canvas>
+    <p><a href="/logs">← До списку архівів</a></p>
+
+    <script>
+    function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+    }
+
+    const date = getQueryParam("date");
+    if (!date) {
+        document.getElementById("info").innerText = "❗ Не вказано параметр ?date=YYYY-MM-DD";
+    } else {
+        const path = `/log/${date}.csv`;
+        fetch(path)
+            .then(res => {
+                if (!res.ok) throw new Error("Файл не знайдено");
+                return res.text();
+            })
+            .then(text => {
+                const lines = text.trim().split("\n");
+                const labels = [], temps = [], hums = [], press = [];
+               for (let i = 1; i < lines.length; i++) {
+                const [time, t, h, p] = lines[i].split(",");
+                labels.unshift(time);
+                temps.unshift(parseFloat(t));
+                hums.unshift(parseFloat(h));
+                press.unshift(parseFloat(p));
+                }
+
+
+                document.getElementById("info").innerText = `Графік за ${date}`;
+                const ctx = document.getElementById('bmeChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Температура (°C)',
+                                data: temps,
+                                borderColor: 'red',
+                                yAxisID: 'y_temp'
+                            },
+                            {
+                                label: 'Вологість (%)',
+                                data: hums,
+                                borderColor: 'blue',
+                                yAxisID: 'y_hum'
+                            },
+                            {
+                                label: 'Тиск (гПа)',
+                                data: press,
+                                borderColor: 'green',
+                                yAxisID: 'y_pres'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        stacked: false,
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Час' }
+                            },
+                            y_temp: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'Темп (°C)' },
+                                min: -30,
+                                max: 50,
+                                ticks: { color: 'red' }
+                            },
+                            y_hum: {
+                                type: 'linear',
+                                position: 'right',
+                                title: { display: true, text: 'Вологість (%)' },
+                                min: 0,
+                                max: 100,
+                                ticks: { color: 'blue' },
+                                grid: { drawOnChartArea: false }
+                            },
+                            y_pres: {
+                                type: 'linear',
+                                position: 'right',
+                                offset: true,
+                                title: { display: true, text: 'Тиск (гПа)' },
+                                min: 950,
+                                max: 1050,
+                                ticks: { color: 'green' },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                document.getElementById("info").innerText = "❌ Помилка: " + err.message;
+            });
+    }
+    </script>
+</body>
+</html>

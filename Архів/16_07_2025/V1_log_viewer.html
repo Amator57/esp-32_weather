@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Архівні графіки BME280</title>
+  <script src="chart.js"></script>
+  <script src="chartjs-plugin-zoom.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+    canvas { background: #fff; margin-bottom: 30px; border-radius: 10px; box-shadow: 0 0 10px #aaa; }
+    button { margin: 10px 10px 20px 0; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Графіки температури, тиску та вологості (архів)</h2>
+
+  <button onclick="history.back()">⬅️ Назад до архіву</button>
+  <button onclick="location.href='/'">🏠 На головну</button>
+
+  <canvas id="tempChart" width="800" height="200"></canvas>
+  <canvas id="presChart" width="800" height="200"></canvas>
+  <canvas id="humChart" width="800" height="200"></canvas>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get('date');
+    if (!date) {
+      document.body.innerHTML = "<p>❌ Не вказано дату!</p>";
+      throw new Error("No date specified");
+    }
+
+    async function loadCSV(path) {
+      const res = await fetch(path);
+      const text = await res.text();
+      const lines = text.split('\n').filter(line => line.includes(','));
+
+      const time = [], temp = [], hum = [], pres = [];
+
+      lines.forEach(line => {
+        const parts = line.trim().split(',').map(p => p.trim());
+        if (parts.length !== 4) return;
+
+        const [t, te, hu, pr] = parts;
+        const teVal = parseFloat(te);
+        const huVal = parseFloat(hu);
+        const prVal = parseFloat(pr);
+
+        if (isNaN(teVal) || isNaN(huVal) || isNaN(prVal)) {
+          console.warn("⚠️ Некоректний рядок:", line);
+          return;
+        }
+
+        time.push(t);
+        temp.push(teVal);
+        hum.push(huVal);
+        pres.push(prVal);
+      });
+
+      return { time, temp, hum, pres };
+    }
+
+    function drawChart(id, label, data, color) {
+      const ctx = document.getElementById(id).getContext('2d');
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.time,
+          datasets: [{
+            label, data: data[label], borderColor: color, fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            zoom: {
+              zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                mode: 'x',
+              },
+              pan: {
+                enabled: true,
+                mode: 'x',
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: {
+                parser: 'YYYY-MM-DD HH:mm:ss',
+                tooltipFormat: 'HH:mm',
+                displayFormats: { minute: 'HH:mm' }
+              },
+              title: { display: true, text: 'Час' }
+            },
+            y: {
+              beginAtZero: false,
+              title: { display: true, text: label }
+            }
+          }
+        }
+      });
+    }
+
+    loadCSV(`/log/${date}.csv`).then(data => {
+      drawChart("tempChart", "temp", data, "red");
+      drawChart("presChart", "pres", data, "blue");
+      drawChart("humChart", "hum", data, "green");
+    }).catch(e => {
+      document.body.innerHTML = `<p>❌ Не вдалося завантажити /log/${date}.csv</p>`;
+      console.error(e);
+    });
+  </script>
+</body>
+</html>

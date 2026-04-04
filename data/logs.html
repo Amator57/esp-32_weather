@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Архів логів</title>
+</head>
+<body>
+    <h2>Архів логів BME280</h2>
+    <p>Натисніть на файл, щоб завантажити або переглянути:</p>
+    <ul id="log-list">Завантаження...</ul>
+    <p><a href="/">Назад на головну</a></p>
+
+    <script>
+    fetch('/log_list.json')
+        .then(res => res.json())
+        .then(files => {
+            const list = document.getElementById('log-list');
+            list.innerHTML = '';
+            if (files.length === 0) {
+                list.innerHTML = '<li><em>Немає логів</em></li>';
+                return;
+            }
+            files.forEach(f => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = f.path;
+                a.textContent = f.name;
+                a.target = "_blank";
+                li.appendChild(a);
+                list.appendChild(li);
+            });
+        })
+        .catch(e => {
+            document.getElementById('log-list').innerHTML = '<li><em>Помилка завантаження</em></li>';
+        });
+    </script>
+</body>
+</html>

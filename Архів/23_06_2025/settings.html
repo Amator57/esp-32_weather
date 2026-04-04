@@ -1,0 +1,26 @@
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Налаштування ESP32</title>
+</head>
+<body>
+  <h2>Налаштування пристрою</h2>
+  <form method="POST" action="/save">
+    <label>Назва пристрою: <input type="text" name="device_name" value="%DEVICE_NAME%"></label><br>
+    <label>SSID: <input type="text" name="ssid" value="%WIFI_SSID%"></label><br>
+    <label>Пароль: <input type="password" name="pass" value=""></label><br>
+    <label>Часовий пояс: <input type="text" name="tz" value="%TZ%"></label><br><br>
+
+    <label><input type="checkbox" name="switch1" %SW1%> Годинник</label><br>
+    <label><input type="checkbox" name="switch2" %SW2%> Барометер</label><br>
+    <label><input type="checkbox" name="switch3" %SW3%> Заповіт</label><br>
+    <label><input type="checkbox" name="switch4" %SW4%> Фото</label><br><br>
+    <label><input type="checkbox" name="switch5" %SW5%> Слава</label><br><br>
+    <label><input type="checkbox" name="switch6" %SW6%> Тризуб</label><br><br>
+    <label><input type="checkbox" name="switch7" %SW7%> Москалі їбучі</label><br><br>
+    <button type="submit">Зберегти</button>
+  </form>
+</body>
+</html>

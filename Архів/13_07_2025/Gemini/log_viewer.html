@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Архівний графік BME280</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@latest/dist/chartjs-plugin-zoom.min.js"></script> </head>
+<body>
+    <h2>Графік з архіву</h2>
+    <p id="info">Завантаження...</p>
+    <canvas id="bmeChart" width="800" height="400"></canvas>
+    <p><a href="/logs">← До списку архівів</a></p>
+
+    <script>
+    function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+    }
+
+    const date = getQueryParam("date");
+    if (!date) {
+        document.getElementById("info").innerText = "❗ Не вказано параметр ?date=YYYY-MM-DD";
+    } else {
+        const path = `/log/${date}.csv`;
+        fetch(path)
+            .then(res => {
+                if (!res.ok) throw new Error("Файл не знайдено, або помилка завантаження: " + res.status);
+                return res.text();
+            })
+            .then(text => {
+                const lines = text.trim().split("\n");
+                const temps = [], hums = [], press = [];
+
+                // Перевіряємо, чи є дані крім заголовка
+                if (lines.length <= 1) {
+                    document.getElementById("info").innerText = "⚠️ Немає даних для цієї дати.";
+                    return;
+                }
+
+                const labels = []; // Будемо використовувати для часу
+                for (let i = 1; i < lines.length; i++) { // Пропускаємо заголовок
+                    const parts = lines[i].split(",");
+                    if (parts.length === 4) {
+                        labels.push(parts[0]); // Час
+                        temps.push(parseFloat(parts[1]));
+                        hums.push(parseFloat(parts[2]));
+                        press.push(parseFloat(parts[3]));
+                    }
+                }
+
+                if (labels.length === 0) {
+                    document.getElementById("info").innerText = "⚠️ Немає коректних даних для цієї дати.";
+                    return;
+                }
+
+                document.getElementById("info").innerText = `Графік за: ${date}`;
+
+                const minTemp = Math.min(...temps);
+                const maxTemp = Math.max(...temps);
+                const minHum = Math.min(...hums);
+                const maxHum = Math.max(...hums);
+                const minPres = Math.min(...press);
+                const maxPres = Math.max(...press);
+
+                const ctx = document.getElementById("bmeChart").getContext("2d");
+                if (window.myChart) window.myChart.destroy();
+                window.myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels, // Використовуємо об'єкти Date
+                        datasets: [
+                            {
+                                label: 'Температура (°C)',
+                                data: temps,
+                                borderColor: 'red',
+                                borderWidth: 1.5,
+                                fill: false,
+                                yAxisID: 'y_temp'
+                            },
+                            {
+                                label: 'Вологість (%)',
+                                data: hums,
+                                borderColor: 'blue',
+                                borderWidth: 1.5,
+                                fill: false,
+                                yAxisID: 'y_hum'
+                            },
+                            {
+                                label: 'Тиск (гПа)',
+                                data: press,
+                                borderColor: 'green',
+                                borderWidth: 1.5,
+                                fill: false,
+                                yAxisID: 'y_pres'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: { // Додано плагін масштабування та прокрутки
+                            zoom: {
+                                pan: {
+                                    enabled: true,
+                                    mode: 'x', // Прокрутка лише по осі X
+                                    threshold: 5 // Мінімальний рух для прокрутки
+                                },
+                                zoom: {
+                                    wheel: {
+                                        enabled: true, // Масштабування колесом миші
+                                    },
+                                    pinch: {
+                                        enabled: true // Масштабування щипком (на сенсорних екранах)
+                                    },
+                                    mode: 'x', // Масштабування лише по осі X
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'minute',
+                                    tooltipFormat: 'HH:mm:ss',
+                                    displayFormats: {
+                                        minute: 'HH:mm'
+                                    }
+                                },
+                                // Встановлюємо початковий вигляд на останню годину
+                                min: labels.length > 0 ? new Date(new Date(labels[labels.length - 1]).getTime() - 60 * 60 * 1000).toISOString() : undefined,
+                                max: labels.length > 0 ? new Date(labels[labels.length - 1]).toISOString() : undefined,
+                                title: { display: true, text: 'Час' }
+                            },
+                            y_temp: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'Температура (°C)' },
+                                ticks: { color: 'red' },
+                                suggestedMin: Math.floor(minTemp - 1),
+                                suggestedMax: Math.ceil(maxTemp + 1)
+                            },
+                            y_hum: {
+                                type: 'linear',
+                                position: 'right',
+                                title: { display: true, text: 'Вологість (%)' },
+                                ticks: { color: 'blue' },
+                                suggestedMin: Math.floor(minHum - 1),
+                                suggestedMax: Math.ceil(maxHum + 1),
+                                grid: { drawOnChartArea: false }
+                            },
+                            y_pres: {
+                                type: 'linear',
+                                position: 'right',
+                                offset: true,
+                                title: { display: true, text: 'Тиск (гПа)' },
+                                ticks: { color: 'green' },
+                                suggestedMin: Math.floor(minPres - 1),
+                                suggestedMax: Math.ceil(maxPres + 1),
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                document.getElementById("info").innerText = "❌ Помилка завантаження або обробки даних: " + err.message;
+                console.error("Помилка:", err);
+            });
+    }
+    </script>
+    <script src="/graph.js"></script>
+
+</body>
+</html>

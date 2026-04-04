@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Налаштування ESP32</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; padding: 20px; }
+    .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input[type="text"], input[type="password"], input[type="number"] {
+      width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;
+    }
+    input[type="checkbox"] { margin-right: 5px; }
+    button {
+      margin-top: 20px; padding: 10px 20px;
+      background-color: #28a745; color: #fff;
+      border: none; border-radius: 5px;
+      font-size: 16px; cursor: pointer;
+    }
+    button:hover { background-color: #218838; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Налаштування ESP32</h2>
+    <form action="/save" method="POST">
+      <label for="device_name">Назва пристрою:</label>
+      <input type="text" id="device_name" name="device_name" value="%DEVICE_NAME%">
+
+      <label for="ssid">Назва Wi-Fi мережі (SSID):</label>
+      <input type="text" id="ssid" name="ssid" value="%WIFI_SSID%">
+
+      <label for="password">Пароль до Wi-Fi:</label>
+      <input type="password" id="password" name="password">
+
+      <label for="timezone_offset">Зміщення часового поясу (наприклад, -2 для Києва):</label>
+      <input type="number" id="timezone_offset" name="timezone_offset" min="-12" max="14" value="%TZ_OFFSET%">
+
+      <label><input type="checkbox" name="use_dst" %USE_DST_CHECKED%> Використовувати літній час (DST)</label>
+
+      <label><input type="checkbox" name="switch1" %SW1_CHECKED%> Перемикач 1</label>
+      <label><input type="checkbox" name="switch2" %SW2_CHECKED%> Перемикач 2</label>
+      <label><input type="checkbox" name="switch3" %SW3_CHECKED%> Перемикач 3</label>
+      <label><input type="checkbox" name="switch4" %SW4_CHECKED%> Перемикач 4</label>
+      <label><input type="checkbox" name="switch5" %SW5_CHECKED%> Перемикач 5</label>
+      <label><input type="checkbox" name="switch6" %SW6_CHECKED%> Перемикач 6</label>
+      <label><input type="checkbox" name="switch7" %SW7_CHECKED%> Перемикач 7</label>
+
+      <button type="submit">💾 Зберегти</button>
+    </form>
+  </div>
+</body>
+</html>
+
+

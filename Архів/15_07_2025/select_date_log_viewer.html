@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Графіки з архіву</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    canvas { background: white; margin: 20px 0; }
+    .container { max-width: 800px; margin: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Графіки BME280 за обрану дату</h2>
+
+    <label for="datePicker">Оберіть дату:</label>
+    <input type="date" id="datePicker" max="" />
+
+    <canvas id="chartTemp"></canvas>
+    <canvas id="chartPres"></canvas>
+    <canvas id="chartHum"></canvas>
+  </div>
+
+  <script>
+    const tempCtx = document.getElementById('chartTemp').getContext('2d');
+    const presCtx = document.getElementById('chartPres').getContext('2d');
+    const humCtx  = document.getElementById('chartHum').getContext('2d');
+
+    let tempChart, presChart, humChart;
+
+    // Обмежити дату вибору на сьогодні
+    document.getElementById("datePicker").max = new Date().toISOString().split("T")[0];
+
+    document.getElementById("datePicker").addEventListener("change", () => {
+      const selected = document.getElementById("datePicker").value;
+      if (selected) loadCSV(`/log/${selected}.csv`);
+    });
+
+    async function loadCSV(path) {
+      try {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error("Не знайдено CSV");
+
+        const text = await res.text();
+        const lines = text.trim().split('\n');
+        const time = [], temp = [], hum = [], pres = [];
+
+        for (let line of lines) {
+          const parts = line.trim().split(';');
+          if (parts.length === 4) {
+            time.push(parts[0]);
+            temp.push(parseFloat(parts[1]));
+            hum.push(parseFloat(parts[2]));
+            pres.push(parseFloat(parts[3]));
+          }
+        }
+
+        drawCharts(time, temp, hum, pres);
+      } catch (e) {
+        alert("Помилка: " + e.message);
+      }
+    }
+
+    function drawCharts(time, temp, hum, pres) {
+      if (tempChart) tempChart.destroy();
+      if (presChart) presChart.destroy();
+      if (humChart) humChart.destroy();
+
+      tempChart = new Chart(tempCtx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [{
+            label: "Температура (°C)",
+            data: temp,
+            borderColor: "red",
+            fill: false
+          }]
+        }
+      });
+
+      presChart = new Chart(presCtx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [{
+            label: "Тиск (hPa)",
+            data: pres,
+            borderColor: "blue",
+            fill: false
+          }]
+        }
+      });
+
+      humChart = new Chart(humCtx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [{
+            label: "Вологість (%)",
+            data: hum,
+            borderColor: "green",
+            fill: false
+          }]
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+▶️ Як використовувати:
+🔹 Збережи цей код у файл:
+decode_backtrace.bat
+
+🔹 Подвійний клік не працює — запускай із PowerShell або CMD:
+
+для  powershell
+ 
+decode_backtrace.bat 0x40083c15 0x4008ed4d 0x40094431 ...
+( це мається на увазі Backtrace: 0x40083c15:0x3ffde740 0x4008ed4d:0x3ffde760 0x40094431:0x3ffde780 0x4015748f:0x3ffde800 0x401574d6:0x3ffde820 0x40157437:0x3ffde840 0x4015778a:0x3ffde860 0x40157fa5:0x3ffde880 0x400e7958:0x3ffde8a0 0x400e799d:0x3ffde8c0 0x400de29c:0x3ffde8e0 0x400de2c4:0x3ffde900 0x400e676b:0x3ffde920 0x400d2ef7:0x3ffde9c0 0x400dff09:0x3ffdea30 0x400dcaed:0x3ffdea80 0x400dd949:0x3ffdead0 0x400ddb4d:0x3ffdeb20 0x4015a079:0x3ffdeb40 0x4015a0ed:0x3ffdeb70 0x4015a95a:0x3ffdeb90)
+🔎 Отримаєш деталізований вивід функцій, які спричинили падіння.
+
+📌 Приклад виводу:
+plaintext
+
+🔍 Декодування backtrace...
+
+panic_abort at /path/esp-idf/components/esp_system/panic.c:...
+esp_system_abort at /...
+main.cpp:123
+...

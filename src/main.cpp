@@ -236,22 +236,18 @@ String buildTZString(int offsetHours, bool useDST) {
 //Додано очищення найстарішого запису, якщо масив заповнений.
 // Оптимізовано - забрано не потрібні перевірки на дублікати
 void storeToHistory(float temp, float hum, float pres, const String& timeStr) {
-  if (historyIndex >= MAX_MEASUREMENTS) {
-    // Зсув усіх записів вліво (видаляємо найстаріший)
-    for (int i = 1; i < MAX_MEASUREMENTS; ++i) {
-      history[i - 1] = history[i];
-    }
-    historyIndex = MAX_MEASUREMENTS - 1;
-  }
-
-  history[historyIndex].temperature = temp;
-  history[historyIndex].humidity = hum;
-  history[historyIndex].pressure = pres;
-  history[historyIndex].timeStr = timeStr;
-  historyIndex++;
+  int index = totalMeasurements % MAX_MEASUREMENTS;
+  history[index].temperature = temp;
+  history[index].humidity = hum;
+  history[index].pressure = pres;
+  strncpy(history[index].timeStr, timeStr.c_str(), 19);
+  history[index].timeStr[19] = '\0';
+  
+  totalMeasurements++;
+  historyIndex = totalMeasurements % MAX_MEASUREMENTS; // Вказівник для веб-сервера (кільцевий буфер)
 
   Serial.printf("💾 Збережено запис #%d: %s | %.2f°C %.2f%% %.2f hPa\n",
-                historyIndex, timeStr.c_str(), temp, hum, pres);
+                totalMeasurements, timeStr.c_str(), temp, hum, pres);
 }
 
 //////////////
@@ -408,14 +404,15 @@ void saveHistoryTask(void *parameter) {
     file.println("Time,Temperature,Humidity,Pressure");
   }
 
-  // Записуємо всі записи з history[]
+  // Записуємо всі записі з history[] (Кільцевий буфер)
   int written = 0;
-  for (int i = lastSavedIndex; i < historyIndex; i++) {
-    const BMEData &d = history[i];
-    if (d.timeStr == "") continue;
+  for (uint32_t i = lastSavedTotal; i < totalMeasurements; i++) {
+    int idx = i % MAX_MEASUREMENTS;
+    const BMEData &d = history[idx];
+    if (d.timeStr[0] == '\0') continue;
 
     bool ok = file.printf("%s,%.2f,%.2f,%.2f\n",
-                          d.timeStr.c_str(),
+                          d.timeStr,
                           d.temperature,
                           d.humidity,
                           d.pressure);
@@ -427,7 +424,8 @@ void saveHistoryTask(void *parameter) {
   delay(50);
 
   Serial.printf("✅ Архів завершено: %s (%d записів)\n", filename.c_str(), written);
-  lastSavedIndex = historyIndex;
+  lastSavedTotal = totalMeasurements;
+  lastSavedIndex = totalMeasurements % MAX_MEASUREMENTS;
 
   if (clearAfterSave) {
     clearHistoryData();  // очищаємо history[]
@@ -486,47 +484,29 @@ void clearOldLogs(int maxDays) {
 
   File file = root.openNextFile();
   while (file) {
-    String fullPath = file.name();         // напр. "/2025-07-10.csv"
+    const char* fullPath = file.name();
     size_t size = file.size();
     totalFiles++;
 
-    Serial.printf("🔍 Знайдено файл: %s (%u байт)\n", fullPath.c_str(), size);
-
-    if (!fullPath.endsWith(".csv")) {
-      Serial.println("⚠️ Пропускаємо: не .csv файл.");
+    if (strstr(fullPath, ".csv") == NULL) {
       file = root.openNextFile();
       continue;
     }
 
-    // Витягуємо лише ім’я файлу без шляху "/"
-    String fileNameOnly = fullPath.substring(fullPath.lastIndexOf('/') + 1);
-    fileNameOnly.trim();
-
-    Serial.printf("📄 Ім’я для аналізу: [%s] (довжина: %d)\n", fileNameOnly.c_str(), fileNameOnly.length());
-
-    // Покажемо побайтово
-    for (size_t i = 0; i < fileNameOnly.length(); i++) {
-      Serial.printf("  char[%d] = '%c' (0x%02X)\n", i, fileNameOnly[i], fileNameOnly[i]);
-    }
+    const char* slash = strrchr(fullPath, '/');
+    const char* fileNameOnly = (slash) ? slash + 1 : fullPath;
 
     struct tm tm = {};
-    if (strptime(fileNameOnly.c_str(), "%Y-%m-%d.csv", &tm)) {
+    if (strptime(fileNameOnly, "%Y-%m-%d.csv", &tm)) {
       time_t fileTime = mktime(&tm);
       double ageDays = difftime(now, fileTime) / 86400.0;
 
-      Serial.printf("📅 Вік файлу: %.2f днів\n", ageDays);
-
       if (ageDays > maxDays) {
-        Serial.printf("🗑 Видалення файлу: %s (вік: %.1f днів)\n", fileNameOnly.c_str(), ageDays);
-        deleteLogFile(fileNameOnly.c_str());  // ← правильне ім’я
+        Serial.printf("🗑 Видалення файлу: %s (вік: %.1f днів)\n", fileNameOnly, ageDays);
+        deleteLogFile(fileNameOnly);  
         deletedFiles++;
-      } else {
-        Serial.println("✅ Файл актуальний — не видаляється.");
       }
-    } else {
-      Serial.println("⚠️ Неможливо розпарсити дату з імені.");
     }
-
     file = root.openNextFile();
   }
 
@@ -591,7 +571,7 @@ void setup() {
     delay(200);
   bme.begin(0x76);
   for (int j = 0; j < MAX_MEASUREMENTS; ++j) {
-    history[j].timeStr = "";
+    history[j].timeStr[0] = '\0';
     history[j].temperature = 0.0f;
     history[j].humidity = 0.0f;
     history[j].pressure = 0.0f;
@@ -900,18 +880,21 @@ server.on("/bme_chart_data", HTTP_GET, [](AsyncWebServerRequest *request) {
   bool first = true;
 
   // ✅ Вираховуємо, з якого індекса брати дані (останній блок у межах limit)
-  int startIndex = max(0, historyIndex - limit);
+  int totalCount = min(totalMeasurements, (uint32_t)MAX_MEASUREMENTS);
+  int effectiveLimit = min(limit, totalCount);
+  int startIdx = totalMeasurements - effectiveLimit;
 
-  for (int i = startIndex; i < historyIndex; i++) {
-    const BMEData &d = history[i];
-    if (d.timeStr == "") continue;
+  for (int i = 0; i < effectiveLimit; i++) {
+    int idx = (startIdx + i) % MAX_MEASUREMENTS;
+    const BMEData &d = history[idx];
+    if (d.timeStr[0] == '\0') continue;
 
     if (!first) response->print(",");
     first = false;
 
     response->printf(
       "{\"time\":\"%s\",\"temperature\":%.2f,\"humidity\":%.2f,\"pressure\":%.2f}",
-      d.timeStr.c_str(), d.temperature, d.humidity, d.pressure
+      d.timeStr, d.temperature, d.humidity, d.pressure
     );
   }
 
@@ -1493,23 +1476,25 @@ void performHistoryFileSave() {
   }
 
   // Записуємо лише нові, ще не збережені дані
-  Serial.printf("Архівація з рядка: %u\n", lastSavedIndex);
-    //Serial.print("Архівація з рядка: "); // <--- Додайте цей рядок
-    //Serial.println(lastSavedIndex); // <--- Додайте цей рядок
-  for (int i = lastSavedIndex; i < historyIndex; ++i) {
-    file.printf("%s,%.2f,%.2f,%.2f\n",
-                history[i].timeStr.c_str(),
-                history[i].temperature,
-                history[i].humidity,
-                history[i].pressure);
+  Serial.printf("Архівація, нових записів: %u\n", totalMeasurements - lastSavedTotal);
+  for (uint32_t i = lastSavedTotal; i < totalMeasurements; ++i) {
+    int idx = i % MAX_MEASUREMENTS;
+    if (history[idx].timeStr[0] != '\0') {
+      file.printf("%s,%.2f,%.2f,%.2f\n",
+                  history[idx].timeStr,
+                  history[idx].temperature,
+                  history[idx].humidity,
+                  history[idx].pressure);
+    }
   }
 
   file.close();
 
-  Serial.printf("📦 Архівовано %d нових записів у %s\n", historyIndex - lastSavedIndex, filename.c_str());
+  Serial.printf("📦 Архівовано %d нових записів у %s\n", totalMeasurements - lastSavedTotal, filename.c_str());
 
   // Оновлюємо межу архівації
-  lastSavedIndex = historyIndex;
+  lastSavedTotal = totalMeasurements;
+  lastSavedIndex = totalMeasurements % MAX_MEASUREMENTS;
 Serial.printf("Оновлене значення lastSavedIndex: %u\n", lastSavedIndex);
     //Serial.print("Оновлене значення lastArchivedIndex: "); // <--- Додайте цей рядок
     //Serial.println(lastSavedIndex); // <--- Додайте цей рядок
@@ -1581,23 +1566,18 @@ unsigned long getDisplayDuration(DisplayMode mode) {
 }
 
 // === 🔁 СКИДАННЯ ІНДЕКСІВ НА ПОЧАТКУ ДОБИ ===
-//Оновлено 19.07.2025
 void resetHistoryForNewDay() {
   clearHistoryData();   // повне очищення масиву
-  historyIndex = 0;     // лічильник записів
-  lastSavedIndex = 0;   // межа архівації
+  historyIndex = 0;
+  lastSavedIndex = 0;
+  totalMeasurements = 0;
+  lastSavedTotal = 0;
   Serial.println("🔄 Історія очищена: новий день почався");
 }
 
 // === 🌡️ ФУНКЦІЯ ДОДАВАННЯ ЗАПИСУ ДО HISTORY[] ===
 void saveCurrentReadingToHistory(float temp, float hum, float pres, const String& timeStr) {
-  if (historyIndex >= MAX_MEASUREMENTS) return;
- 
-history[historyIndex].timeStr = timeStr;
-history[historyIndex].temperature = temp;
-history[historyIndex].humidity = hum;
-history[historyIndex].pressure = pres;
-historyIndex++;
+  storeToHistory(temp, hum, pres, timeStr);
 }
 // ===================================================
 

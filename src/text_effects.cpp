@@ -20,7 +20,7 @@ void printLineTypingEffect(const TextLine& line, int screenW, int lineHeight) {
 
   for (int i = 0; i < strlen(line.text); i++) {
     tft.print(line.text[i]);                                // Друкуємо символ
-    delay(line.delayMs);                                    // Затримка між символами
+    vTaskDelay(line.delayMs / portTICK_PERIOD_MS);          // Затримка між символами
   }
 }
 

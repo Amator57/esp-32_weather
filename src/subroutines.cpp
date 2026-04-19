@@ -1,4 +1,4 @@
-#include "globals.h"
+﻿#include "globals.h"
 #include "text_effects.h"
 /*
 struct TextLine {
@@ -180,7 +180,7 @@ void shevchenko (void)// Дисплей
  for (int i = 0; i < sizeof(lines1) / sizeof(lines1[0]); i++) {
     printLineTypingEffect(lines1[i], screenW, lineHeight);
  }
-    delay(1000); // Затримка між рядками (можна налаштувати)
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
 /*
 // Синій верх
 tft.fillRect(0, 0, screenW, screenH / 2, TFT_BLUE);
@@ -189,7 +189,7 @@ tft.fillRect(0, screenH / 2, screenW, screenH / 2, TFT_YELLOW);
 for (int i = 0; i < sizeof(lines2) / sizeof(lines2[0]); i++) {
   printLineTypingEffect(lines2[i], screenW, lineHeight);
 }
-  delay(1000); // Затримка між рядками (можна налаштувати)
+  vTaskDelay(1000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
 */
    // Синій верх
  tft.fillRect(0, 0, screenW, screenH / 2, TFT_BLUE);
@@ -198,7 +198,7 @@ for (int i = 0; i < sizeof(lines2) / sizeof(lines2[0]); i++) {
  for (int i = 0; i < sizeof(lines3) / sizeof(lines3[0]); i++) {
   printLineTypingEffect(lines3[i], screenW, lineHeight);
  }
-  delay(1000); // Затримка між рядками (можна налаштувати)
+  vTaskDelay(1000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
 
    // Синій верх
    tft.fillRect(0, 0, screenW, screenH / 2, TFT_BLUE);
@@ -207,7 +207,7 @@ for (int i = 0; i < sizeof(lines2) / sizeof(lines2[0]); i++) {
    for (int i = 0; i < sizeof(lines4) / sizeof(lines4[0]); i++) {
     printLineTypingEffect(lines4[i], screenW, lineHeight);
    }
-    delay(1000); // Затримка між рядками (можна налаштувати)
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
     tft.unloadFont();
 /*
        // Синій верх
@@ -217,7 +217,7 @@ for (int i = 0; i < sizeof(lines2) / sizeof(lines2[0]); i++) {
  for (int i = 0; i < sizeof(lines5) / sizeof(lines5[0]); i++) {
   printLineTypingEffect(lines5[i], screenW, lineHeight);
  }
-  delay(1000); // Затримка між рядками (можна налаштувати)
+  vTaskDelay(1000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
 
     // Синій верх
     tft.fillRect(0, 0, screenW, screenH / 2, TFT_BLUE);
@@ -226,7 +226,7 @@ for (int i = 0; i < sizeof(lines2) / sizeof(lines2[0]); i++) {
     for (int i = 0; i < sizeof(lines6) / sizeof(lines6[0]); i++) {
      printLineTypingEffect(lines6[i], screenW, lineHeight);
     }
-     delay(5000); // Затримка між рядками (можна налаштувати)
+     vTaskDelay(5000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
      */
      /*
         // Синій верх
@@ -236,7 +236,7 @@ for (int i = 0; i < sizeof(lines2) / sizeof(lines2[0]); i++) {
  for (int i = 0; i < sizeof(lines7) / sizeof(lines7[0]); i++) {
   printLineTypingEffect(lines7[i], screenW, lineHeight);
  }
-  delay(5000); // Затримка між рядками (можна налаштувати)
+  vTaskDelay(5000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
   */
  }
 
@@ -251,7 +251,7 @@ void vivat(void) //москалі..
  for (int i = 0; i < sizeof(lines7) / sizeof(lines7[0]); i++) {
   printLineTypingEffect(lines7[i], screenW, lineHeight);
  }
-  delay(5000); // Затримка між рядками (можна налаштувати) 
+  vTaskDelay(5000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати) 
   tft.unloadFont();
 }
 
@@ -269,7 +269,7 @@ void slava_ukraini(void)
  for (int i = 0; i < sizeof(lines8) / sizeof(lines8[0]); i++) {
   printLineTypingEffect(lines8[i], screenW, lineHeight);
  }
-  delay(5000); // Затримка між рядками (можна налаштувати) 
+  vTaskDelay(5000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати) 
 
   // Синій верх
  tft.fillRect(0, 0, screenW, screenH / 2, TFT_BLUE);
@@ -278,7 +278,7 @@ void slava_ukraini(void)
 for (int i = 0; i < sizeof(lines9) / sizeof(lines9[0]); i++) {
   printLineTypingEffect(lines9[i], screenW, lineHeight);
  }
-  delay(5000); // Затримка між рядками (можна налаштувати)
+  vTaskDelay(5000 / portTICK_PERIOD_MS); // Затримка між рядками (можна налаштувати)
 tft.unloadFont();
 }
 
@@ -326,7 +326,7 @@ void shevchenko() {
     for (auto& line : lines1)
         printLineTypingEffect(line, screenW, lineHeight);
 
-    delay(1000);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     tft.fillRect(0, 0, screenW, screenH / 2, TFT_BLUE);
     tft.fillRect(0, screenH / 2, screenW, screenH / 2, TFT_YELLOW);
@@ -335,7 +335,7 @@ void shevchenko() {
         printLineTypingEffect(line, screenW, lineHeight);
 
     tft.unloadFont();
-    delay(1000);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
 void welcomeMessage() {
@@ -345,6 +345,6 @@ void welcomeMessage() {
     tft.setCursor(10, 50);
     tft.println("Вітаємо!");
     tft.unloadFont();
-    delay(2000);
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 }
 */

@@ -8,6 +8,8 @@ DisplayMode currentDisplayMode = MODE_BME_DATA; // Або activeDisplayModes[0];
 
 BMEData history[MAX_MEASUREMENTS];
 int historyIndex = 0;
+uint32_t totalMeasurements = 0;
+uint32_t lastSavedTotal = 0;
 
 /*
 const int screenW = 160;

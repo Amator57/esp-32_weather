@@ -168,7 +168,7 @@ static void handleBMEChartData(AsyncWebServerRequest *request) {
 
         response->printf(
             "{\"time\":\"%s\",\"temperature\":%.2f,\"humidity\":%.2f,\"pressure\":%.2f}",
-            d.timeStr.c_str(), d.temperature + tempOffset, d.humidity, d.pressure
+            d.timeStr, d.temperature + tempOffset, d.humidity, d.pressure
         );
     }
     response->print("]");

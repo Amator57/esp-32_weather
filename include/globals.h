@@ -17,8 +17,11 @@ struct BMEData {
     float temperature;
     float humidity;
     float pressure;
-    String timeStr;
+    char timeStr[20];
 };
+
+extern uint32_t totalMeasurements;
+extern uint32_t lastSavedTotal;
 
 #define MAX_MEASUREMENTS 1440
 

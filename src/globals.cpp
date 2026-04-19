@@ -6,6 +6,9 @@ Adafruit_BME280 bme;
 int currentRotationIndex = 0;
 DisplayMode currentDisplayMode = MODE_BME_DATA; // Або activeDisplayModes[0];
 
+BMEData history[MAX_MEASUREMENTS];
+int historyIndex = 0;
+
 /*
 const int screenW = 160;
 const int screenH = 128;

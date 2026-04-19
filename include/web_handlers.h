@@ -25,14 +25,14 @@ extern float humOffset;  // поправка вологості
 extern float lastTemp, lastHum, lastPress;
 extern int historyIndex;
 extern const int MAX_POINTS;
-
+/*
 struct BMEData {
   float temperature;
   float humidity;
   float pressure;
   String timeStr;
 };
-
+*/
 extern BMEData history[];
 
 // === ✅ Допоміжні функції (повинні бути оголошені у main.cpp) ===

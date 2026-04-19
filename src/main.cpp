@@ -1,5 +1,6 @@
 // Блок ОНОВЛЕННЯ ДАНИХ СЕНСОРІВ ТА ЗБЕРЕЖЕННЯ В ІСТОРІЮ рядок 1088
 // Очистити старі файли логів (14 днів)  clearOldLogs(14) - 1073; рядок 417  clearOldLogs(14)
+#include <Arduino.h>
 #include <WiFi.h>
 #include <SPIFFS.h>
 #include <ESPAsyncWebServer.h>
@@ -86,27 +87,7 @@ unsigned char flag_w=1;
 unsigned char  ind;
 bool testArchiveFlag = true; //Флаг тестового архівування
 #define MAX_POINTS 1440
-#define MAX_MEASUREMENTS 1440
 #define SENSOR_POWER_PIN   19     // Заміни на свій пін живлення
-
-
-/*
-struct BMEData {
-  float temperature;
-  float humidity;
-  float pressure;
-  String timeStr;
-};
-*/
-// Масив для збереження історії
-const int maxHistorySize = 1440;
-BMEData history[maxHistorySize];
-
-//BMEData history[MAX_MEASUREMENTS];
-int historyIndex = 0;
-//+++++++++++++++=============
-
-//DisplayMode currentDisplayMode = MODE_NONE;
 unsigned long displayModeStartTime = 0; // Час початку поточного режиму відображення
 
 // Оголошення нових допоміжних функцій для відображення
@@ -240,7 +221,6 @@ String getCurrentDate() {
 }
 
 // --- Декларації наперед (збережені з оригіналу) ---
-String getTodayDate();
 void clearOldLogs(int maxDays);
 
 //////////////
@@ -648,11 +628,21 @@ void setup() {
   }
 
   // === 🕒 Синхронізація NTP → RTC ===
-  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                        timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+  // Встановлюємо NTP сервера
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // Офсет 0, бо ми використовуємо TZ змінну середовища
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("⏳ Синхронізація часу з NTP...");
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 1000)) { // Чекаємо максимум 1 секунду
+      rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                          timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+      Serial.println("✅ Час синхронізовано з NTP та збережено в RTC.");
+    } else {
+      Serial.println("⚠️ Не вдалося отримати час з NTP (таймаут 1с). Використовуємо RTC.");
+    }
+  } else {
+    Serial.println("ℹ️ WiFi не підключено, синхронізація NTP пропущена. Використовуємо RTC.");
   }
 Serial.println("♻️ Скидання прапорів — рестарт!");
      f_0 = f_4 = f_8 = f_12 = f_16 = f_20 = true;//Додано 06.08.2025. Скидання прапорів для архівації кожні 4 години
@@ -1053,17 +1043,17 @@ server.on("/bme_chart_data_archive", HTTP_GET, [](AsyncWebServerRequest *request
       line.trim();
       if (line.length() == 0) continue;
 
-      int t1 = line.indexOf(';');
-      int t2 = line.indexOf(';', t1 + 1);
-      int t3 = line.indexOf(';', t2 + 1);
+      int t1 = line.indexOf(',');
+      int t2 = line.indexOf(',', t1 + 1);
+      int t3 = line.indexOf(',', t2 + 1);
       if (t1 > 0 && t2 > t1 && t3 > t2) {
-        String time = line.substring(0, t1);
+        String timeVal = line.substring(0, t1);
         float temp = line.substring(t1 + 1, t2).toFloat();
         float hum  = line.substring(t2 + 1, t3).toFloat();
         float pres = line.substring(t3 + 1).toFloat();
 
         JsonObject obj = arr.createNestedObject();
-        obj["time"] = time;
+        obj["time"] = timeVal;
         obj["temperature"] = temp;
         obj["humidity"] = hum;
         obj["pressure"] = pres;
@@ -1601,7 +1591,7 @@ void resetHistoryForNewDay() {
 
 // === 🌡️ ФУНКЦІЯ ДОДАВАННЯ ЗАПИСУ ДО HISTORY[] ===
 void saveCurrentReadingToHistory(float temp, float hum, float pres, const String& timeStr) {
-  if (historyIndex >= maxHistorySize) return;
+  if (historyIndex >= MAX_MEASUREMENTS) return;
  
 history[historyIndex].timeStr = timeStr;
 history[historyIndex].temperature = temp;
@@ -1639,6 +1629,10 @@ String getTodayDate(int offset) {
   char buffer[11];
   strftime(buffer, sizeof(buffer), "%Y-%m-%d", &timeinfo);
   return String(buffer);
+}
+
+String getTodayDate() {
+    return getTodayDate(0);
 }
 
 

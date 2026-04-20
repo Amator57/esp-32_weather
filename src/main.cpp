@@ -586,6 +586,8 @@ void setup() {
   // === 📶 Wi-Fi ===
   Serial.printf("Намагаюся підключитися до SSID: %s\n", wifiSSID.c_str());
   if (wifiSSID != "Unknown" && wifiPassword != "") {
+    WiFi.setSleep(false);
+    WiFi.setAutoReconnect(true);
     WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
   } else {
     Serial.println("Немає збережених даних Wi-Fi, пропускаю підключення.");
@@ -1077,6 +1079,16 @@ void loop() {
   static bool archiveDoneToday = false;
   static bool fileCreated = false;
   static String lastInitDate = ""; 
+  
+  static unsigned long lastWiFiCheck = 0;
+  if (WiFi.status() != WL_CONNECTED && (currentMillis - lastWiFiCheck > 20000)) {
+      lastWiFiCheck = currentMillis;
+      Serial.println("⚠️ Wi-Fi втрачено! Спроба перепідключення...");
+      if (wifiSSID != "Unknown" && wifiPassword != "") {
+           WiFi.disconnect();
+           WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+      }
+  }
 /*
 • 	static у функції або глобальному контексті означає, що змінна зберігає своє значення між викликами, 
     але видима лише в межах того файлу або функції, де оголошена.

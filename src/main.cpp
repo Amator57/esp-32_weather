@@ -254,7 +254,7 @@ void storeToHistory(float temp, float hum, float pres, const String& timeStr) {
 // ОНОВЛЕНО: Формат дати/часу на YYYY-MM-DD HH:MM:SS для кращої сумісності
 String getCurrentTime() {
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 10)) {
+  if (!getLocalTime(&timeinfo, 100)) {
     DateTime now = rtc.now();
     char buf[20];
     sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
@@ -268,7 +268,7 @@ String getCurrentTime() {
 //Функція для "короткого" часу HH:MM:SS для запуску задачі архівування
 String getShortTime() {
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 10)) {
+  if (!getLocalTime(&timeinfo, 100)) {
     DateTime now = rtc.now();
     char buf[6];
     sprintf(buf, "%02d:%02d", now.hour(), now.minute());
@@ -620,17 +620,27 @@ void setup() {
 
   // === 🕒 Синхронізація NTP → RTC ===
   // Встановлюємо NTP сервера
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // Офсет 0, бо ми використовуємо TZ змінну середовища
+  // Отримуємо рядок TZ для конфігурації
+  String sign = tzOffset >= 0 ? "-" : "+";
+  int absOffset = abs(tzOffset);
+  String zoneName = (tzOffset == 2) ? "EET" : "TZN";
+  String dstName  = (tzOffset == 2) ? "EEST" : "TZD";
+  String tzStr = zoneName + sign + String(absOffset);
+  if (useDST) tzStr += dstName + ",M3.5.0/3,M10.5.0/4";
+
+  configTzTime(tzStr.c_str(), "pool.ntp.org", "time.nist.gov"); // Офсет 0, бо ми використовуємо TZ змінну середовища
   
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("⏳ Синхронізація часу з NTP...");
     struct tm timeinfo;
-    if (getLocalTime(&timeinfo, 1000)) { // Чекаємо максимум 1 секунду
+    if (getLocalTime(&timeinfo, 5000)) { // Чекаємо максимум 5 секунд
       rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                           timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
-      Serial.println("✅ Час синхронізовано з NTP та збережено в RTC.");
+      char timeLog[64];
+      strftime(timeLog, sizeof(timeLog), "%Y-%m-%d %H:%M:%S", &timeinfo);
+      Serial.printf("✅ RTC synchronized. Local time: %s\n", timeLog);
     } else {
-      Serial.println("⚠️ Не вдалося отримати час з NTP (таймаут 1с). Використовуємо RTC.");
+      Serial.println("⚠️ Не вдалося отримати час з NTP (таймаут 5с). Використовуємо RTC.");
     }
   } else {
     Serial.println("ℹ️ WiFi не підключено, синхронізація NTP пропущена. Використовуємо RTC.");
@@ -782,16 +792,16 @@ server.on("/save", HTTP_POST, [&](AsyncWebServerRequest *request) {
         preferences.putFloat("humOffset", humOffset);
     preferences.end();
 
-    Serial.printf("💾 Калібрування температури збережено. tempOffset = %.1f°C\n", tempOffset);
-    Serial.printf("💧 Калібрування вологості збережено: %.1f%%\n", humOffset);
+    Serial.printf("💾 Налаштування збережено: Offset=%d, DST=%s\n", tzOffset, useDST ? "Так" : "Ні");
     // --- Встановлення часової зони ---
     String sign = tzOffset >= 0 ? "-" : "+";
     int absOffset = abs(tzOffset);
-    String tzString = "UTC" + sign + String(absOffset);
+    String tzStr = "GMT" + sign + String(absOffset);
     if (useDST)
-        tzString += "DST,M3.5.0/3,M10.5.0/4";
-    setenv("TZ", tzString.c_str(), 1);
+        tzStr += "DST,M3.5.0/3,M10.5.0/4";
+    setenv("TZ", tzStr.c_str(), 1);
     tzset();
+    Serial.printf("🌍 Системна часова зона (TZ) оновлена: %s\n", tzStr.c_str());
 
     // --- Повернення на сторінку налаштувань з повідомленням ---
     request->send(200, "text/html; charset=utf-8",

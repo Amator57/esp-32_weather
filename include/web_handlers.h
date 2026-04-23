@@ -45,11 +45,21 @@ void saveHistoryTask(void *parameter);
 // ===================================================================================
 void loadConfig() { 
   preferences.begin("config", false); // false = читання/запис
-  //preferences.begin("config", true);
   deviceName = preferences.getString("deviceName", deviceName);
   wifiSSID   = preferences.getString("wifiSSID", wifiSSID);
   wifiPassword = preferences.getString("wifiPassword", wifiPassword);
-  tzOffset   = preferences.getInt("tz_off", 2);
+  
+  // Міграція зі старого ключа "tzOffset" на новий "tz_off"
+  if (preferences.isKey("tz_off")) {
+      tzOffset = preferences.getInt("tz_off", 2);
+  } else if (preferences.isKey("tzOffset")) {
+      tzOffset = preferences.getInt("tzOffset", 2);
+      Serial.println("ℹ️ Міграція ключа: tzOffset -> tz_off");
+      preferences.putInt("tz_off", tzOffset);
+  } else {
+      tzOffset = 2;
+  }
+
   useDST     = preferences.getBool("use_dst_b", true);
   switch1 = preferences.getBool("switch1", false);
   switch2 = preferences.getBool("switch2", false);
@@ -58,21 +68,28 @@ void loadConfig() {
   switch5 = preferences.getBool("switch5", false);
   switch6 = preferences.getBool("switch6", false);
   switch7 = preferences.getBool("switch7", false);
-  tempOffset = preferences.getFloat("tempOffset", 0.0);  // ✅підвантаження поправки температури
-  humOffset  = preferences.getFloat("humOffset", 0.0);   // ✅підвантаження поправки вологості
-  Serial.printf("🌡️ Температурний офсет підвантажено: %.1f°C\n", tempOffset);
-  Serial.printf("💧 Вологісний офсет підвантажено: %.1f%%\n", humOffset);
+  tempOffset = preferences.getFloat("tempOffset", 0.0);
+  humOffset  = preferences.getFloat("humOffset", 0.0);
+  
+  Serial.printf("🌡️ Температурний офсет: %.1f°C\n", tempOffset);
+  Serial.printf("💧 Вологісний офсет: %.1f%%\n", humOffset);
+  Serial.printf("🕒 Часовий пояс (UTC): %d (DST: %s)\n", tzOffset, useDST ? "Так" : "Ні");
   preferences.end();
 
-  // Встановлення часової зони
+  // Встановлення часової зони (EET формат для нашого регіону)
   String sign = tzOffset >= 0 ? "-" : "+";
   int absOffset = abs(tzOffset);
-  String tzString = "UTC" + sign + String(absOffset);
+  // Використовуємо EET/EEST для зміщення 2, для інших - загальний формат TZN
+  String zoneName = (tzOffset == 2) ? "EET" : "TZN";
+  String dstName  = (tzOffset == 2) ? "EEST" : "TZD";
+  
+  String tzStr = zoneName + sign + String(absOffset);
   if (useDST) {
-    tzString += "DST,M3.5.0/3,M10.5.0/4";
+    tzStr += dstName + ",M3.5.0/3,M10.5.0/4";
   }
-  setenv("TZ", tzString.c_str(), 1);
+  setenv("TZ", tzStr.c_str(), 1);
   tzset();
+  Serial.printf("🌍 Системна часова зона (TZ) встановлена: %s\n", tzStr.c_str());
 }
 
 // ===================================================================================

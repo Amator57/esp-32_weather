@@ -577,6 +577,13 @@ void setup() {
     history[j].pressure = 0.0f;
   }
 
+  // === 🌡️ Перше зчитування даних ===
+  if (checkAndRecoverBME280()) {
+      Serial.println("✅ Початкові дані BME280 отримано.");
+  } else {
+      Serial.println("⚠️ Не вдалося отримати початкові дані BME280.");
+  }
+
   // === 📜 Конфігурація ===
   loadConfig();
   String tzString = buildTZString(tzOffset, useDST);
@@ -600,6 +607,7 @@ void setup() {
       String apIP = WiFi.softAPIP().toString();
       Serial.println("✅ AP запущено. IP: " + apIP);
       tft.drawString("AP Mode: " + apIP, 10, 50);
+      delay(5000); // Даємо 5 секунд, щоб прочитати IP
     }
   } else {
     wifiSSID = WiFi.SSID();
@@ -607,6 +615,7 @@ void setup() {
     Serial.println("✅ WiFi: " + wifiSSID + ", IP: " + ip);
     tft.drawString("WiFi: " + wifiSSID, 10, 50);
     tft.drawString("IP: " + ip, 10, 70);
+    delay(5000); // Даємо 5 секунд, щоб прочитати IP
   }
 
   // === 🕒 Синхронізація NTP → RTC ===

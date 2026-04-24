@@ -1032,43 +1032,7 @@ server.on("/bme_chart_data_archive", HTTP_GET, [](AsyncWebServerRequest *request
 });
 
 
-  // 🔵 3. JSON для зовнішніх запитів (динамічний масштаб)
-  server.on("/api/history.json", HTTP_GET, [](AsyncWebServerRequest *request) {
-    File file = SPIFFS.open("/log/2025-07-14.csv");  // тестова дата
-    if (!file || file.isDirectory()) {
-      request->send(404, "application/json", "{\"error\":\"Файл не знайдено\"}");
-      return;
-    }
 
-    DynamicJsonDocument doc(8192);
-    JsonArray arr = doc.to<JsonArray>();
-    while (file.available()) {
-      String line = file.readStringUntil('\n');
-      line.trim();
-      if (line.length() == 0) continue;
-
-      int t1 = line.indexOf(',');
-      int t2 = line.indexOf(',', t1 + 1);
-      int t3 = line.indexOf(',', t2 + 1);
-      if (t1 > 0 && t2 > t1 && t3 > t2) {
-        String timeVal = line.substring(0, t1);
-        float temp = line.substring(t1 + 1, t2).toFloat();
-        float hum  = line.substring(t2 + 1, t3).toFloat();
-        float pres = line.substring(t3 + 1).toFloat();
-
-        JsonObject obj = arr.createNestedObject();
-        obj["time"] = timeVal;
-        obj["temperature"] = temp;
-        obj["humidity"] = hum;
-        obj["pressure"] = pres;
-      }
-    }
-    file.close();
-
-    String json;
-    serializeJson(doc, json);
-    request->send(200, "application/json", json);
-  });
 
   // =====================================================================================
   // 🗂 ОБСЛУГОВУВАННЯ СТАТИКИ, ЛОГІВ ТА 404
@@ -1100,25 +1064,53 @@ void loop() {
   static String lastInitDate = ""; 
   
   static unsigned long lastWiFiCheck = 0;
-  if (WiFi.status() != WL_CONNECTED && (currentMillis - lastWiFiCheck > 20000)) {
-      lastWiFiCheck = currentMillis;
-      Serial.println("⚠️ Wi-Fi втрачено! Спроба перепідключення...");
-      if (wifiSSID != "Unknown" && wifiPassword != "") {
-           WiFi.disconnect();
-           WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+  static unsigned long wifiLostTime = 0;
+  static unsigned long lastTimeUpdate = 0;
+  static String timeOnly = "";
+  static String currentTime = "";
+  static String today = "";
+
+  // 📶 Wi-Fi Watchdog & AP Management
+  if (WiFi.status() == WL_CONNECTED) {
+      if (wifiLostTime != 0) {
+          Serial.println("✅ Wi-Fi відновлено!");
+          wifiLostTime = 0;
+      }
+      // Якщо підключені до STA — вимикаємо AP для стабільності
+      if (WiFi.getMode() & WIFI_MODE_AP) {
+          Serial.println("ℹ️ STA підключено. Вимикаю точку доступу (AP)...");
+          WiFi.softAPdisconnect(true);
+          WiFi.mode(WIFI_STA);
+      }
+  } else {
+      if (wifiLostTime == 0) wifiLostTime = currentMillis;
+      
+      if (currentMillis - lastWiFiCheck > 20000) {
+          lastWiFiCheck = currentMillis;
+          Serial.printf("⚠️ Wi-Fi втрачено (%d сек)! Спроба перепідключення...\n", (int)(currentMillis - wifiLostTime)/1000);
+          
+          if (wifiSSID != "Unknown" && wifiPassword != "") {
+              Serial.println("🔄 Виклик WiFi.reconnect()...");
+              WiFi.reconnect();
+              WiFi.setSleep(false); // Вимикаємо Modem Sleep
+          }
+      }
+      
+      // Якщо зв'язку немає > 5 хвилин — рестарт
+      if (currentMillis - wifiLostTime > 300000) {
+          Serial.println("‼️ Wi-Fi відсутній занадто довго. Перезавантаження...");
+          delay(1000);
+          ESP.restart();
       }
   }
-/*
-• 	static у функції або глобальному контексті означає, що змінна зберігає своє значення між викликами, 
-    але видима лише в межах того файлу або функції, де оголошена.
-• 	lastInitDate — зберігає дату, коли востаннє було створено архівний файл.
-• 	static гарантує, що значення не буде втрачено між циклами  або викликами функції, 
-    якщо вона оголошена локально.
-• 	Ініціалізація = "" означає, що на старті значення порожнє, тобто архів ще не створено.
-*/
-  String timeOnly = getShortTime();  // HH:MM
-  String currentTime = getCurrentTime();   // "YYYY-MM-DD-HH:MM:SS" 
-  String today = getTodayDate(0);     // YYYY-MM-DD
+
+  // ⏱️ Оптимізоване оновлення часу (раз на секунду)
+  if (currentMillis - lastTimeUpdate >= 1000 || timeOnly == "") {
+      lastTimeUpdate = currentMillis;
+      timeOnly = getShortTime();  // HH:MM
+      currentTime = getCurrentTime();   // "YYYY-MM-DD-HH:MM:SS" 
+      today = getTodayDate(0);     // YYYY-MM-DD
+  }
  // static String lastArchiveSlot = "";   // відстежуємо останню 4-годинну архівацію. Закоментовано 06.08.2025
 
   //String today = getTodayDate();      // ✅ рядок потрібен! Оновлює актуальну дату
@@ -1173,7 +1165,8 @@ void loop() {
 //+++++++++++++++++++++++++++++++++
 // Заміна 03.08.2025. Архівація та очищення логів кожні 4 години
 // ✅ 2. Створення нового CSV файлу о 00:03
- timeOnly = getShortTime();
+  // Використовуємо вже оновлене значення timeOnly зі статичної змінної
+
 int hh = timeOnly.substring(0,2).toInt();
 int mm = timeOnly.substring(3,5).toInt();
 int minutesNow = hh * 60 + mm;
@@ -1489,6 +1482,18 @@ counpress = 0; // Скидання лічильника тиску
       break;
   } //End switch (currentDisplayMode)
 //+++++++++++++++++++++++++++++++++
+  // 📊 ДІАГНОСТИКА (Heap + RSSI)
+  static unsigned long lastDiagUpdate = 0;
+  if (currentMillis - lastDiagUpdate > 60000) { // раз на хвилину
+      lastDiagUpdate = currentMillis;
+      if (WiFi.status() == WL_CONNECTED) {
+          Serial.printf("📊 СТАТУС: Heap: %d bytes, Wi-Fi RSSI: %d dBm\n", ESP.getFreeHeap(), WiFi.RSSI());
+      } else {
+          Serial.printf("📊 СТАТУС: Heap: %d bytes, Wi-Fi: НЕ ПІДКЛЮЧЕНО\n", ESP.getFreeHeap());
+      }
+  }
+
+  delay(1); // Мікропауза для стабільності фонових процесів
 } // End loop()
 
 //++++++++++++++++++++++++++++++++++++++

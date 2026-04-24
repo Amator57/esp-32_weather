@@ -38,6 +38,11 @@ String tzString = "EET-2EEST,M3.5.0/3,M10.5.0/4";
 
 bool useDST = true;       // Літній час
 int tzOffset = 2;  // за замовчуванням для Києва (UTC+2)
+
+// Мережеві налаштування (Static IP)
+String staticIP = "192.168.1.230";
+String gateway = "192.168.1.1";
+String subnet = "255.255.255.0";
 // Ініціалізація глобальних змінних для ротації дисплея
 bool rotationActive = false;
 DisplayMode previousDisplayMode = MODE_NONE; // Ініціалізуємо попередній режим відображення
@@ -305,6 +310,11 @@ String processor(const String& var) {
 }
   if (var == "HUM_OFFSET") {
     return String(humOffset, 1);} // округлено до 1 знаку після коми
+  
+  if (var == "STATIC_IP") return staticIP;
+  if (var == "GATEWAY") return gateway;
+  if (var == "SUBNET") return subnet;
+
   return String();
 }
 
@@ -325,6 +335,12 @@ void saveConfig() {
   preferences.putBool("switch6", switch6);
   preferences.putBool("switch7", switch7);
   preferences.putInt("tz_off", tzOffset);
+  
+  // Збереження мережевих налаштувань
+  preferences.putString("staticIP", staticIP);
+  preferences.putString("gateway", gateway);
+  preferences.putString("subnet", subnet);
+
   preferences.end();
 }
 
@@ -598,15 +614,18 @@ void setup() {
       }
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
-  // 2. Статична IP-адреса (на основі ваших логів)
-  IPAddress local_IP(192, 168, 1, 230);
-  IPAddress gateway(192, 168, 1, 1);
-  IPAddress subnet(255, 255, 255, 0);
-  IPAddress primaryDNS(8, 8, 8, 8);   
-  IPAddress secondaryDNS(1, 1, 1, 1);
-
-  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-    Serial.println("❌ Помилка конфігурації Static IP");
+  // 2. Статична IP-адреса (на основі налаштувань)
+  IPAddress local_IP, gateway_IP, subnet_IP;
+  if (local_IP.fromString(staticIP) && gateway_IP.fromString(gateway) && subnet_IP.fromString(subnet)) {
+      IPAddress primaryDNS(8, 8, 8, 8);   
+      IPAddress secondaryDNS(1, 1, 1, 1);
+      if (!WiFi.config(local_IP, gateway_IP, subnet_IP, primaryDNS, secondaryDNS)) {
+          Serial.println("❌ Помилка конфігурації Static IP");
+      } else {
+          Serial.println("✅ Застосовано Static IP: " + staticIP);
+      }
+  } else {
+      Serial.println("⚠️ Некоректні налаштування Static IP, використовується DHCP");
   }
 
   Serial.printf("Намагаюся підключитися до SSID: %s\n", wifiSSID.c_str());
@@ -668,8 +687,16 @@ Serial.println("♻️ Скидання прапорів — рестарт!");
      f_0 = f_4 = f_8 = f_12 = f_16 = f_20 = true;//Додано 06.08.2025. Скидання прапорів для архівації кожні 4 години
      arhiv = false;//Додано 06.08.2025. Скидання прапорів для архівації кожні 4 години
   // =====================================================================================
-  // 🌍 📡 ВЕБ-СЕРВЕР: ГОЛОВНІ HTML-СТОРІНКИ
+  // 🌍 📡 ВЕБ-СЕРВЕР: ГЛОБАЛЬНІ ОБРОБНИКИ
   // =====================================================================================
+  // 🔄 Перезавантаження (Пріоритет #1)
+  server.on("/reboot_now", HTTP_GET, [](AsyncWebServerRequest *request){
+    Serial.println("🚀 [DEBUG] Кнопка REBOOT натиснута!");
+    request->send(200, "text/html", "<meta charset='UTF-8'><h2>🔁 Перезавантаження...</h2><script>setTimeout(()=>{window.location.href='/'},8000);</script>");
+    delay(1500); 
+    ESP.restart();
+  });
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
      Serial.println("➡️ [/] Головна сторінка");
     request->send(SPIFFS, "/index.html", "text/html", false, processor);
@@ -686,29 +713,7 @@ Serial.println("♻️ Скидання прапорів — рестарт!");
     response->addHeader("Content-Type", "text/html; charset=utf-8");
     request->send(response);
   });
-            //Додано мною 27.07.2025. Початок
-  // 🔄 Перезавантаження ESP32
-    server.on("/restart", HTTP_POST, [](AsyncWebServerRequest *request){
-    request->send(200, "text/html", R"rawliteral(
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Перезавантаження</title>
-        <script>
-          setTimeout(function() {
-            window.location.href = "/";
-          }, 8000); // почекай 8 секунд і перенаправ
-        </script>
-      </head>
-      <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
-        <h2>🔁 Пристрій перезавантажується...</h2>
-        <p>Будь ласка, зачекайте кілька секунд.</p>
-      </body>
-      </html>
-    )rawliteral");
-    delay(500); // дати час відповіді HTTP
-    ESP.restart();
-  });
+
   
    // 📄 JS для графіка
   server.on("/graph.js", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -793,6 +798,14 @@ server.on("/save", HTTP_POST, [&](AsyncWebServerRequest *request) {
     // --- Калібрування вологості ---
     if (request->hasParam("humOffset", true))
         humOffset = request->getParam("humOffset", true)->value().toFloat();
+
+    // --- Налаштування мережі ---
+    if (request->hasParam("static_ip", true))
+        staticIP = request->getParam("static_ip", true)->value();
+    if (request->hasParam("gateway", true))
+        gateway = request->getParam("gateway", true)->value();
+    if (request->hasParam("subnet", true))
+        subnet = request->getParam("subnet", true)->value();
     // --- Збереження всіх параметрів в Preferences ---
     preferences.begin("config", false); // false = запис
         preferences.putString("deviceName", deviceName);
@@ -809,6 +822,10 @@ server.on("/save", HTTP_POST, [&](AsyncWebServerRequest *request) {
         preferences.putBool("switch7", switch7);
         preferences.putFloat("tempOffset", tempOffset);
         preferences.putFloat("humOffset", humOffset);
+        
+        preferences.putString("staticIP", staticIP);
+        preferences.putString("gateway", gateway);
+        preferences.putString("subnet", subnet);
     preferences.end();
 
     Serial.printf("💾 Налаштування збережено: Offset=%d, DST=%s\n", tzOffset, useDST ? "Так" : "Ні");

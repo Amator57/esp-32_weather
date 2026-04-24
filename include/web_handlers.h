@@ -20,6 +20,9 @@ extern bool useDST;
 extern bool switch1, switch2, switch3, switch4, switch5, switch6, switch7;
 extern float tempOffset;   // ✅ Поправка температури
 extern float humOffset;  // поправка вологості
+extern String staticIP;
+extern String gateway;
+extern String subnet;
 
 // === ✅ Оголошення зовнішніх змінних, які використовуються у хендлерах ===
 extern float lastTemp, lastHum, lastPress;
@@ -70,6 +73,9 @@ void loadConfig() {
   switch7 = preferences.getBool("switch7", false);
   tempOffset = preferences.getFloat("tempOffset", 0.0);
   humOffset  = preferences.getFloat("humOffset", 0.0);
+  staticIP   = preferences.getString("staticIP", "192.168.1.230");
+  gateway    = preferences.getString("gateway", "192.168.1.1");
+  subnet     = preferences.getString("subnet", "255.255.255.0");
   
   Serial.printf("🌡️ Температурний офсет: %.1f°C\n", tempOffset);
   Serial.printf("💧 Вологісний офсет: %.1f%%\n", humOffset);

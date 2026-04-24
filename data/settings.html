@@ -26,6 +26,13 @@
     <p>UTC Зміщення (наприклад 2): <input type="number" name="timezone_offset" value="%TZ_OFFSET%" min="-12" max="14"></p>
     <p><label><input type="checkbox" name="use_dst" %USE_DST_CHECKED%> Літній час (DST)</label></p>
 
+    <hr>
+    <h3>Налаштування мережі (Static IP):</h3>
+    <p>IP адреса: <input type="text" name="static_ip" value="%STATIC_IP%" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$"></p>
+    <p>Шлюз (Gateway): <input type="text" name="gateway" value="%GATEWAY%" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$"></p>
+    <p>Маска (Subnet): <input type="text" name="subnet" value="%SUBNET%" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$"></p>
+    <hr>
+
     <p>Калібрування температури (°C): 
       <input type="number" name="tempOffset" value="%TEMP_OFFSET%" step="0.1" min="-10" max="10">
     </p>
@@ -46,11 +53,12 @@
     <p><button type="submit" style="background-color:#28a745; color:white;">💾 Зберегти</button></p>
   </form>
 
-  <form method="POST" action="/restart" onsubmit="return confirm('Справді перезавантажити ESP32?');">
-    <button type="submit" style="background-color:#dc3545; color:white; font-size:18px;">
+  <div style="margin-top: 20px;">
+    <a href="/reboot_now" 
+       style="display: inline-block; padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 6px; font-size: 18px;">
       🔁 Перезавантажити ESP32
-    </button>
-  </form>
+    </a>
+  </div>
 
   <p><a href="/">⬅ Назад</a></p>
 </body>

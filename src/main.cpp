@@ -591,9 +591,28 @@ void setup() {
   tzset();
 
   // === 📶 Wi-Fi ===
+  // 1. Додавання обробника подій (Діагностика причин розриву)
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+      if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+          Serial.printf("📡 Wi-Fi відключено! Причина (Reason): %d\n", info.wifi_sta_disconnected.reason);
+      }
+  }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  // 2. Статична IP-адреса (на основі ваших логів)
+  IPAddress local_IP(192, 168, 1, 230);
+  IPAddress gateway(192, 168, 1, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  IPAddress primaryDNS(8, 8, 8, 8);   
+  IPAddress secondaryDNS(1, 1, 1, 1);
+
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("❌ Помилка конфігурації Static IP");
+  }
+
   Serial.printf("Намагаюся підключитися до SSID: %s\n", wifiSSID.c_str());
   if (wifiSSID != "Unknown" && wifiPassword != "") {
-    WiFi.setSleep(false);
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(WIFI_PS_NONE); // Максимальна потужність, без засинання
     WiFi.setAutoReconnect(true);
     WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
   } else {
@@ -1092,7 +1111,7 @@ void loop() {
           if (wifiSSID != "Unknown" && wifiPassword != "") {
               Serial.println("🔄 Виклик WiFi.reconnect()...");
               WiFi.reconnect();
-              WiFi.setSleep(false); // Вимикаємо Modem Sleep
+              WiFi.setSleep(WIFI_PS_NONE); // Максимальна потужність
           }
       }
       

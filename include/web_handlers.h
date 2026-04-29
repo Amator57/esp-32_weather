@@ -145,7 +145,7 @@ static void handleLogs(AsyncWebServerRequest *request) {
             file = root.openNextFile();
         }
     }
-    response->print(F("</ul><p><a href=\"/\">На головну</a></p>"));
+    response->print(F("</ul><p><a href=\"/all_logs_viewer\">📈 Переглянути всі дні разом (Зведені графіки)</a></p><p><a href=\"/\">На головну</a></p>"));
     request->send(response);
 }
 
@@ -154,6 +154,40 @@ static void handleLogs(AsyncWebServerRequest *request) {
 // ===================================================================================
 static void handleLogViewer(AsyncWebServerRequest *request) {
     AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/log_viewer.html", "text/html");
+    response->addHeader("Content-Type", "text/html; charset=utf-8");
+    request->send(response);
+}
+
+// ===================================================================================
+// 📊 API: Список логів (/api/logs)
+// ===================================================================================
+static void handleApiLogs(AsyncWebServerRequest *request) {
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    response->print("[");
+    File root = SPIFFS.open("/log");
+    bool first = true;
+    if (root && root.isDirectory()) {
+        File file = root.openNextFile();
+        while (file) {
+            String fullPath = file.name();
+            if (fullPath.endsWith(".csv")) {
+                String fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
+                if (!first) response->print(",");
+                response->print("\"" + fileName + "\"");
+                first = false;
+            }
+            file = root.openNextFile();
+        }
+    }
+    response->print("]");
+    request->send(response);
+}
+
+// ===================================================================================
+// 📊 Перегляд зведеного архіву (all_logs_viewer.html)
+// ===================================================================================
+static void handleAllLogsViewer(AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/all_logs_viewer.html", "text/html");
     response->addHeader("Content-Type", "text/html; charset=utf-8");
     request->send(response);
 }
@@ -226,7 +260,9 @@ void registerWebHandlers(AsyncWebServer &server) {
     server.on("/", HTTP_GET, handleRootPage);
     server.on("/settings", HTTP_GET, handleSettingsPage);
     server.on("/logs", HTTP_GET, handleLogs);
+    server.on("/api/logs", HTTP_GET, handleApiLogs);
     server.on("/log_viewer", HTTP_GET, handleLogViewer);
+    server.on("/all_logs_viewer", HTTP_GET, handleAllLogsViewer);
     server.on("/bme_data", HTTP_GET, handleBMEData);
     server.on("/bme_chart_data", HTTP_GET, handleBMEChartData);
     server.on("/save_now", HTTP_GET, handleManualSave);
@@ -587,7 +623,9 @@ void registerWebHandlers(AsyncWebServer &server) {
     server.on("/", HTTP_GET, handleRootPage);
     server.on("/settings", HTTP_GET, handleSettingsPage);
     server.on("/logs", HTTP_GET, handleLogs);
+    server.on("/api/logs", HTTP_GET, handleApiLogs);
     server.on("/log_viewer", HTTP_GET, handleLogViewer);
+    server.on("/all_logs_viewer", HTTP_GET, handleAllLogsViewer);
     server.on("/bme_data", HTTP_GET, handleBMEData);
     server.on("/bme_chart_data", HTTP_GET, handleBMEChartData);
     server.on("/save_now", HTTP_GET, handleManualSave);

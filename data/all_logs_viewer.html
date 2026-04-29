@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Зведені графіки з архіву</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    canvas { background: white; margin: 20px 0; }
+    .container { max-width: 95%; margin: auto; }
+    .stats { font-size: 14px; margin-top: -15px; margin-bottom: 20px; }
+    .stats b { display: inline-block; width: 80px; }
+    #status { margin-bottom: 15px; font-weight: bold; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Зведені графіки BME280 за всі дні</h2>
+    <div id="status">Завантаження списку архівів...</div>
+
+    <canvas id="chartTemp"></canvas>
+    <div id="tempStats" class="stats"></div>
+
+    <canvas id="chartPres"></canvas>
+    <div id="presStats" class="stats"></div>
+
+    <canvas id="chartHum"></canvas>
+    <div id="humStats" class="stats"></div>
+    <p><a href="/logs">⬅ Назад до списку архівів</a></p>
+  </div>
+
+  <script>
+    const tempCtx = document.getElementById('chartTemp').getContext('2d');
+    const presCtx = document.getElementById('chartPres').getContext('2d');
+    const humCtx  = document.getElementById('chartHum').getContext('2d');
+
+    let tempChart, presChart, humChart;
+
+    function safeParse(val) {
+      if (!val) return NaN;
+      val = val.replace(',', '.').replace(/[^0-9.\-]/g, '');
+      return parseFloat(val);
+    }
+
+    async function loadAllData() {
+      try {
+        const resList = await fetch('/api/logs');
+        if (!resList.ok) throw new Error("Не вдалося завантажити список логів");
+        let files = await resList.json();
+        
+        // сортуємо файли по даті
+        files.sort();
+
+        if (files.length === 0) {
+            document.getElementById('status').innerText = "Немає доступних файлів архіву.";
+            return;
+        }
+
+        document.getElementById('status').innerText = `Завантаження даних... (0/${files.length})`;
+
+        const allTime = [], allTemp = [], allHum = [], allPres = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const fileName = files[i];
+            const dateStr = fileName.replace(".csv", "");
+            
+            document.getElementById('status').innerText = `Завантаження даних... (${i+1}/${files.length}): ${fileName}`;
+            try {
+                const res = await fetch(`/log/${fileName}`);
+                if (!res.ok) continue;
+                const text = await res.text();
+                const lines = text.trim().split('\n');
+
+                for (let line of lines) {
+                    const parts = line.trim().split(',');
+                    if (parts.length === 4) {
+                        const timePart = parts[0]; 
+                        allTime.push(`${dateStr} ${timePart}`);
+                        allTemp.push(safeParse(parts[1]));
+                        allHum.push(safeParse(parts[2]));
+                        allPres.push(safeParse(parts[3]));
+                    }
+                }
+            } catch (err) {
+                console.error(`Помилка завантаження ${fileName}:`, err);
+            }
+        }
+
+        document.getElementById('status').innerText = `Дані успішно завантажено. Всього точок: ${allTime.length}`;
+        drawCharts(allTime, allTemp, allHum, allPres);
+
+      } catch (e) {
+        document.getElementById('status').innerText = "Помилка: " + e.message;
+      }
+    }
+
+    function getStats(arr) {
+      const clean = arr.filter(v => !isNaN(v));
+      if (clean.length === 0) return { min: NaN, max: NaN, avg: NaN };
+
+      const min = Math.min(...clean);
+      const max = Math.max(...clean);
+      const avg = clean.reduce((a, b) => a + b, 0) / clean.length;
+      return { min, max, avg };
+    }
+
+    function drawCharts(time, temp, hum, pres) {
+      if (tempChart) tempChart.destroy();
+      if (presChart) presChart.destroy();
+      if (humChart) humChart.destroy();
+
+      const zoomOptions = {
+        pan: { enabled: true, mode: 'x' },
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: 'x'
+        }
+      };
+
+      const tStats = getStats(temp);
+      document.getElementById("tempStats").innerHTML =
+        `<b>Макс:</b> ${isNaN(tStats.max) ? "-" : tStats.max.toFixed(1)}°C &nbsp; 
+         <b>Мін:</b> ${isNaN(tStats.min) ? "-" : tStats.min.toFixed(1)}°C &nbsp; 
+         <b>Сер:</b> ${isNaN(tStats.avg) ? "-" : tStats.avg.toFixed(1)}°C`;
+
+      tempChart = new Chart(tempCtx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [{ label: "Температура (°C)", data: temp, borderColor: "red", fill: false, pointRadius: 0, borderWidth: 1 }]
+        },
+        options: { responsive: true, plugins: { zoom: zoomOptions }, scales: { x: { title: { display: true, text: 'Дата і Час' } } }, animation: false }
+      });
+
+      const pStats = getStats(pres);
+      document.getElementById("presStats").innerHTML =
+        `<b>Макс:</b> ${isNaN(pStats.max) ? "-" : pStats.max.toFixed(1)} hPa &nbsp; 
+         <b>Мін:</b> ${isNaN(pStats.min) ? "-" : pStats.min.toFixed(1)} hPa &nbsp; 
+         <b>Сер:</b> ${isNaN(pStats.avg) ? "-" : pStats.avg.toFixed(1)} hPa`;
+
+      presChart = new Chart(presCtx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [{ label: "Тиск (hPa)", data: pres, borderColor: "blue", fill: false, pointRadius: 0, borderWidth: 1 }]
+        },
+        options: { responsive: true, plugins: { zoom: zoomOptions }, scales: { x: { title: { display: true, text: 'Дата і Час' } } }, animation: false }
+      });
+
+      const hStats = getStats(hum);
+      document.getElementById("humStats").innerHTML =
+        `<b>Макс:</b> ${isNaN(hStats.max) ? "-" : hStats.max.toFixed(1)}% &nbsp; 
+         <b>Мін:</b> ${isNaN(hStats.min) ? "-" : hStats.min.toFixed(1)}% &nbsp; 
+         <b>Сер:</b> ${isNaN(hStats.avg) ? "-" : hStats.avg.toFixed(1)}%`;
+
+      humChart = new Chart(humCtx, {
+        type: 'line',
+        data: {
+          labels: time,
+          datasets: [{ label: "Вологість (%)", data: hum, borderColor: "green", fill: false, pointRadius: 0, borderWidth: 1 }]
+        },
+        options: { responsive: true, plugins: { zoom: zoomOptions }, scales: { x: { title: { display: true, text: 'Дата і Час' } } }, animation: false }
+      });
+    }
+
+    loadAllData();
+  </script>
+</body>
+</html>

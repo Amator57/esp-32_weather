@@ -748,8 +748,38 @@ Serial.println("♻️ Скидання прапорів — рестарт!");
         file = root.openNextFile();
       }
     }
-    response->print(F("</ul><p><a href=\"/\">На головну</a></p>"));
+    response->print(F("</ul><p><a href=\"/all_logs_viewer\">📈 Переглянути всі дні разом (Зведені графіки)</a></p><p><a href=\"/\">На головну</a></p>"));
     request->send(response);
+  });
+
+  // 📊 API: Список логів (/api/logs)
+  server.on("/api/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
+      AsyncResponseStream *response = request->beginResponseStream("application/json");
+      response->print("[");
+      File root = SPIFFS.open("/log");
+      bool first = true;
+      if (root && root.isDirectory()) {
+          File file = root.openNextFile();
+          while (file) {
+              String fullPath = file.name();
+              if (fullPath.endsWith(".csv")) {
+                  String fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
+                  if (!first) response->print(",");
+                  response->print("\"" + fileName + "\"");
+                  first = false;
+              }
+              file = root.openNextFile();
+          }
+      }
+      response->print("]");
+      request->send(response);
+  });
+
+  // 📊 Перегляд зведеного архіву (all_logs_viewer.html)
+  server.on("/all_logs_viewer", HTTP_GET, [](AsyncWebServerRequest *request) {
+      AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/all_logs_viewer.html", "text/html");
+      response->addHeader("Content-Type", "text/html; charset=utf-8");
+      request->send(response);
   });
 
     // 🌡️ BME Дані JSON (поточні)

@@ -19,15 +19,17 @@
     <h2>Зведені графіки BME280 за всі дні</h2>
     <div id="status">Завантаження списку архівів...</div>
 
-    <canvas id="chartTemp"></canvas>
-    <div id="tempStats" class="stats"></div>
+    <div id="chartsContainer" style="display: none;">
+      <canvas id="chartTemp"></canvas>
+      <div id="tempStats" class="stats"></div>
 
-    <canvas id="chartPres"></canvas>
-    <div id="presStats" class="stats"></div>
+      <canvas id="chartPres"></canvas>
+      <div id="presStats" class="stats"></div>
 
-    <canvas id="chartHum"></canvas>
-    <div id="humStats" class="stats"></div>
-    <p><a href="/logs">⬅ Назад до списку архівів</a></p>
+      <canvas id="chartHum"></canvas>
+      <div id="humStats" class="stats"></div>
+    </div>
+    <p><a href="/">⬅ Назад на головну</a> | <a href="/logs">📁 До списку архівів</a></p>
   </div>
 
   <script>
@@ -88,6 +90,7 @@
         }
 
         document.getElementById('status').innerText = `Дані успішно завантажено. Всього точок: ${allTime.length}`;
+        document.getElementById('chartsContainer').style.display = 'block';
         drawCharts(allTime, allTemp, allHum, allPres);
 
       } catch (e) {

@@ -46,14 +46,14 @@ async function loadChart() {
                     {
                         label: 'Вологість (%)',
                         data: hums,
-                        borderColor: 'blue',
+                        borderColor: 'green',
                         fill: false,
                         yAxisID: 'y_hum'
                     },
                     {
                         label: 'Тиск (гПа)',
                         data: press,
-                        borderColor: 'green',
+                        borderColor: 'blue',
                         fill: false,
                         yAxisID: 'y_pres'
                     }
@@ -83,7 +83,7 @@ async function loadChart() {
                         type: 'linear',
                         position: 'right',
                         title: { display: true, text: 'Вологість (%)' },
-                        ticks: { color: 'blue' },
+                        ticks: { color: 'green' },
                         suggestedMin: Math.floor(minHum - 1),
                         suggestedMax: Math.ceil(maxHum + 1),
                         grid: { drawOnChartArea: false }
@@ -93,7 +93,7 @@ async function loadChart() {
                         position: 'right',
                         offset: true,
                         title: { display: true, text: 'Тиск (гПа)' },
-                        ticks: { color: 'green' },
+                        ticks: { color: 'blue' },
                         suggestedMin: Math.floor(minPres - 1),
                         suggestedMax: Math.ceil(maxPres + 1),
                         grid: { drawOnChartArea: false }

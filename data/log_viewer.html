@@ -8,7 +8,7 @@
   <style>
     body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
     canvas { background: white; margin: 20px 0; }
-    .container { max-width: 800px; margin: auto; }
+    .container { max-width: 95%; margin: auto; }
     .stats { font-size: 14px; margin-top: -15px; margin-bottom: 20px; }
     .stats b { display: inline-block; width: 80px; }
   </style>
@@ -20,14 +20,18 @@
     <label for="datePicker">Оберіть дату:</label>
     <input type="date" id="datePicker" max="" />
 
-    <canvas id="chartTemp"></canvas>
-    <div id="tempStats" class="stats"></div>
+    <div id="chartsContainer" style="display: none;">
+      <canvas id="chartTemp"></canvas>
+      <div id="tempStats" class="stats"></div>
 
-    <canvas id="chartPres"></canvas>
-    <div id="presStats" class="stats"></div>
+      <canvas id="chartPres"></canvas>
+      <div id="presStats" class="stats"></div>
 
-    <canvas id="chartHum"></canvas>
-    <div id="humStats" class="stats"></div>
+      <canvas id="chartHum"></canvas>
+      <div id="humStats" class="stats"></div>
+    </div>
+    
+    <p><a href="/">⬅ Назад на головну</a> | <a href="/logs">📁 До списку архівів</a></p>
   </div>
 
   <script>
@@ -71,6 +75,7 @@
           }
         }
 
+        document.getElementById('chartsContainer').style.display = 'block';
         drawCharts(time, temp, hum, pres);
       } catch (e) {
         alert("Помилка: " + e.message);

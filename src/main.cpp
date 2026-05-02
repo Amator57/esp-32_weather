@@ -92,7 +92,7 @@ unsigned char flag_w=1;
 unsigned char  ind;
 bool testArchiveFlag = true; //Флаг тестового архівування
 #define MAX_POINTS 1440
-#define SENSOR_POWER_PIN   19     // Заміни на свій пін живлення
+#define SENSOR_POWER_PIN   3     // Пін живлення для ESP32-S3-Zero (раніше 19)
 unsigned long displayModeStartTime = 0; // Час початку поточного режиму відображення
 
 // Оголошення нових допоміжних функцій для відображення
@@ -557,7 +557,7 @@ void setup() {
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
 
   // === ⏰ RTC, I2C, SPIFFS ===
-  Wire.begin();
+  Wire.begin(1, 2); // SDA = 1, SCL = 2 для ESP32-S3-Zero
   rtc.begin();
 
   Serial.println("Ініціалізація SPIFFS...");
